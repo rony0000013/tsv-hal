@@ -1,0 +1,730 @@
+[workspace]
+channels = ["pytorch", "nvidia", "main", "r", "msys2", "https://repo.anaconda.com/pkgs/main", "https://repo.anaconda.com/pkgs/r"]
+name = "tsv"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[tool.uv.extra-build-dependencies]
+flash-attn = ["torch"]
+
+[dependencies]
+_libgcc_mutex = { version = ">=0.1,<0.2", build = "main" }
+_openmp_mutex = { version = ">=5.1,<6", build = "1_gnu" }
+anyio = { version = ">=3.5.0,<4", build = "py38h06a4308_0" }
+argon2-cffi = { version = ">=21.3.0,<22", build = "pyhd3eb1b0_0" }
+argon2-cffi-bindings = { version = ">=21.2.0,<22", build = "py38h7f8727e_0" }
+asttokens = { version = ">=2.0.5,<3", build = "pyhd3eb1b0_0" }
+attrs = { version = ">=24.2.0,<25", build = "py38h06a4308_0" }
+babel = { version = ">=2.9.1,<3", build = "pyhd3eb1b0_0" }
+backcall = { version = ">=0.2.0,<0.3", build = "pyhd3eb1b0_0" }
+beautifulsoup4 = { version = ">=4.12.3,<5", build = "py38h06a4308_0" }
+blas = { version = ">=1.0,<2", build = "mkl" }
+bleach = { version = ">=4.1.0,<5", build = "pyhd3eb1b0_0" }
+brotlipy = { version = ">=0.7.0,<0.8", build = "py38h27cfd23_1003" }
+bzip2 = { version = ">=1.0.8,<2", build = "h7b6447c_0" }
+ca-certificates = { version = ">=2025.12.2,<2026", build = "h06a4308_0" }
+catalogue = { version = ">=2.0.10,<3", build = "py38h06a4308_0" }
+certifi = { version = ">=2024.8.30,<2025", build = "py38h06a4308_0" }
+cffi = { version = ">=1.15.1,<2", build = "py38h74dc2b5_0" }
+cloudpathlib = { version = ">=0.16.0,<0.17", build = "py38h06a4308_1" }
+colorama = { version = ">=0.4.6,<0.5", build = "py38h06a4308_0" }
+commonmark = { version = ">=0.9.1,<0.10", build = "pyhd3eb1b0_0" }
+confection = { version = ">=0.1.4,<0.2", build = "py38h2f386ee_0" }
+cryptography = { version = ">=38.0.4,<39", build = "py38h9ce1e76_0" }
+cuda = { version = ">=11.6.2,<12", build = "0" }
+cuda-cccl = { version = ">=11.6.55,<12", build = "hf6102b2_0" }
+cuda-command-line-tools = { version = ">=11.8.0,<12", build = "0" }
+cuda-compiler = { version = ">=12.6.2,<13", build = "0" }
+cuda-cudart = { version = ">=11.8.89,<12", build = "0" }
+cuda-cudart-dev = { version = ">=11.6.55,<12", build = "h42ad0f4_0" }
+cuda-cuobjdump = { version = ">=11.6.124,<12", build = "h2eeebcb_0" }
+cuda-cupti = { version = ">=11.8.87,<12", build = "0" }
+cuda-cuxxfilt = { version = ">=11.6.124,<12", build = "hecbf4f6_0" }
+cuda-driver-dev = { version = ">=12.9.79,<13", build = "0" }
+cuda-gdb = { version = ">=12.4.127,<13", build = "0" }
+cuda-libraries = { version = ">=11.8.0,<12", build = "0" }
+cuda-libraries-dev = { version = ">=12.6.2,<13", build = "0" }
+cuda-memcheck = { version = ">=11.8.86,<12", build = "0" }
+cuda-nsight = { version = ">=12.9.79,<13", build = "0" }
+cuda-nsight-compute = { version = ">=12.4.1,<13", build = "0" }
+cuda-nvcc = { version = ">=11.6.124,<12", build = "hbba6d2d_0" }
+cuda-nvdisasm = { version = ">=12.4.127,<13", build = "0" }
+cuda-nvml-dev = { version = ">=11.6.55,<12", build = "haa9ef22_0" }
+cuda-nvprof = { version = ">=12.9.79,<13", build = "0" }
+cuda-nvprune = { version = ">=11.6.124,<12", build = "he22ec0a_0" }
+cuda-nvrtc = { version = ">=11.8.89,<12", build = "0" }
+cuda-nvrtc-dev = { version = ">=11.6.124,<12", build = "h249d397_0" }
+cuda-nvtx = { version = ">=11.8.86,<12", build = "0" }
+cuda-nvvp = { version = ">=12.4.127,<13", build = "0" }
+cuda-runtime = { version = ">=11.8.0,<12", build = "0" }
+cuda-samples = { version = ">=11.6.101,<12", build = "h8efea70_0" }
+cuda-sanitizer-api = { version = ">=12.4.127,<13", build = "0" }
+cuda-toolkit = { version = ">=11.6.2,<12", build = "0" }
+cuda-tools = { version = ">=11.8.0,<12", build = "0" }
+cuda-version = { version = ">=12.9,<13", build = "3" }
+cuda-visual-tools = { version = ">=12.6.2,<13", build = "0" }
+cymem = { version = ">=2.0.6,<3", build = "py38h295c915_0" }
+cython-blis = { version = ">=0.7.9,<0.8", build = "py38h7deecbd_0" }
+dataclasses = { version = ">=0.8,<0.9", build = "pyh6d0b6a4_7" }
+debugpy = { version = ">=1.5.1,<2", build = "py38h295c915_0" }
+decorator = { version = ">=5.1.1,<6", build = "pyhd3eb1b0_0" }
+defusedxml = { version = ">=0.7.1,<0.8", build = "pyhd3eb1b0_0" }
+entrypoints = { version = ">=0.4,<0.5", build = "py38h06a4308_0" }
+executing = { version = ">=0.8.3,<0.9", build = "pyhd3eb1b0_0" }
+ffmpeg = { version = ">=4.3,<5", build = "hf484d3e_0" }
+freetype = { version = ">=2.12.1,<3", build = "h4a9f257_0" }
+future = { version = ">=0.18.3,<0.19", build = "py38h06a4308_0" }
+gds-tools = { version = ">=1.9.1.3,<2", build = "0" }
+giflib = { version = ">=5.2.1,<6", build = "h7b6447c_0" }
+gmp = { version = ">=6.2.1,<7", build = "h295c915_3" }
+gmpy2 = { version = ">=2.1.2,<3", build = "py38heeb90bb_0" }
+gnutls = { version = ">=3.6.15,<4", build = "he1e5248_0" }
+icu = { version = ">=58.2,<59", build = "he6710b0_3" }
+idna = { version = ">=3.7,<4", build = "py38h06a4308_0" }
+importlib-metadata = { version = ">=7.0.1,<8", build = "py38h06a4308_0" }
+importlib_resources = { version = ">=5.2.0,<6", build = "pyhd3eb1b0_1" }
+intel-openmp = { version = ">=2021.4.0,<2022", build = "h06a4308_3561" }
+ipykernel = { version = ">=6.15.2,<7", build = "py38h06a4308_0" }
+ipython = { version = ">=8.8.0,<9", build = "py38h06a4308_0" }
+ipython_genutils = { version = ">=0.2.0,<0.3", build = "pyhd3eb1b0_1" }
+jedi = { version = ">=0.18.1,<0.19", build = "py38h06a4308_1" }
+jinja2 = { version = ">=3.1.4,<4", build = "py38h06a4308_0" }
+jpeg = { version = ">=9e,<10a", build = "h7f8727e_0" }
+json5 = { version = ">=0.9.6,<0.10", build = "pyhd3eb1b0_0" }
+jsonschema = { version = ">=4.23.0,<5", build = "py38h06a4308_0" }
+jupyter_client = { version = ">=7.4.9,<8", build = "py38h06a4308_0" }
+jupyter_core = { version = ">=4.11.2,<5", build = "py38h06a4308_0" }
+jupyter_server = { version = ">=1.23.4,<2", build = "py38h06a4308_0" }
+jupyterlab = { version = ">=3.5.3,<4", build = "py38h06a4308_0" }
+jupyterlab_pygments = { version = ">=0.1.2,<0.2", build = "py_0" }
+jupyterlab_server = { version = ">=2.16.3,<3", build = "py38h06a4308_0" }
+lame = { version = ">=3.100,<4", build = "h7b6447c_0" }
+langcodes = { version = ">=3.3.0,<4", build = "pyhd3eb1b0_0" }
+lcms2 = { version = ">=2.12,<3", build = "h3be6417_0" }
+ld_impl_linux-64 = { version = ">=2.38,<3", build = "h1181459_1" }
+lerc = { version = ">=3.0,<4", build = "h295c915_0" }
+libcublas = { version = ">=11.11.3.6,<12", build = "0" }
+libcublas-dev = { version = ">=11.11.3.6,<12", build = "0" }
+libcufft = { version = ">=10.9.0.58,<11", build = "0" }
+libcufft-dev = { version = ">=10.9.0.58,<11", build = "0" }
+libcufile = { version = ">=1.9.1.3,<2", build = "0" }
+libcufile-dev = { version = ">=1.9.1.3,<2", build = "0" }
+libcurand = { version = ">=10.3.10.19,<11", build = "0" }
+libcurand-dev = { version = ">=10.3.10.19,<11", build = "0" }
+libcusolver = { version = ">=11.4.1.48,<12", build = "0" }
+libcusolver-dev = { version = ">=11.4.1.48,<12", build = "0" }
+libcusparse = { version = ">=11.7.5.86,<12", build = "0" }
+libcusparse-dev = { version = ">=11.7.5.86,<12", build = "0" }
+libdeflate = { version = ">=1.8,<2", build = "h7f8727e_5" }
+libffi = { version = ">=3.4.2,<4", build = "h295c915_4" }
+libgcc-ng = { version = ">=11.2.0,<12", build = "h1234567_1" }
+libgomp = { version = ">=11.2.0,<12", build = "h1234567_1" }
+libiconv = { version = ">=1.16,<2", build = "h7f8727e_2" }
+libidn2 = { version = ">=2.3.2,<3", build = "h7f8727e_0" }
+libjpeg-turbo = { version = ">=2.0.0,<3", build = "h9bf148f_0" }
+libnpp = { version = ">=11.8.0.86,<12", build = "0" }
+libnpp-dev = { version = ">=11.8.0.86,<12", build = "0" }
+libnvjpeg = { version = ">=11.9.0.86,<12", build = "0" }
+libnvjpeg-dev = { version = ">=11.9.0.86,<12", build = "0" }
+libpng = { version = ">=1.6.37,<2", build = "hbc83047_0" }
+libsodium = { version = ">=1.0.18,<2", build = "h7b6447c_0" }
+libstdcxx-ng = { version = ">=11.2.0,<12", build = "h1234567_1" }
+libtasn1 = { version = ">=4.16.0,<5", build = "h27cfd23_0" }
+libtiff = { version = ">=4.4.0,<5", build = "hecacb30_2" }
+libunistring = { version = ">=0.9.10,<0.10", build = "h27cfd23_0" }
+libwebp = { version = ">=1.2.4,<2", build = "h11a3e52_0" }
+libwebp-base = { version = ">=1.2.4,<2", build = "h5eee18b_0" }
+libxml2 = { version = ">=2.9.14,<3", build = "h74e7548_0" }
+libxslt = { version = ">=1.1.35,<2", build = "h4e12654_0" }
+llvm-openmp = { version = ">=14.0.6,<15", build = "h9e868ea_0" }
+lxml = { version = ">=4.9.1,<5", build = "py38h1edc446_0" }
+lz4-c = { version = ">=1.9.3,<2", build = "h295c915_1" }
+markupsafe = { version = ">=2.1.1,<3", build = "py38h7f8727e_0" }
+matplotlib-inline = { version = ">=0.1.6,<0.2", build = "py38h06a4308_0" }
+mistune = { version = ">=0.8.4,<0.9", build = "py38h7b6447c_1000" }
+mkl = { version = ">=2021.4.0,<2022", build = "h06a4308_640" }
+mkl-service = { version = ">=2.4.0,<3", build = "py38h7f8727e_0" }
+mkl_fft = { version = ">=1.3.1,<2", build = "py38hd3c417c_0" }
+mkl_random = { version = ">=1.2.2,<2", build = "py38h51133e4_0" }
+mpc = { version = ">=1.1.0,<2", build = "h10f8cd9_1" }
+mpfr = { version = ">=4.0.2,<5", build = "hb69a4c5_1" }
+mpmath = { version = ">=1.3.0,<2", build = "py38h06a4308_0" }
+murmurhash = { version = ">=1.0.7,<2", build = "py38h295c915_0" }
+nbclassic = { version = ">=1.1.0,<2", build = "py38h06a4308_0" }
+nbclient = { version = ">=0.5.13,<0.6", build = "py38h06a4308_0" }
+nbconvert = { version = ">=6.5.4,<7", build = "py38h06a4308_0" }
+nbformat = { version = ">=5.9.2,<6", build = "py38h06a4308_0" }
+ncurses = { version = ">=6.3,<7", build = "h5eee18b_3" }
+nest-asyncio = { version = ">=1.6.0,<2", build = "py38h06a4308_0" }
+nettle = { version = ">=3.7.3,<4", build = "hbbd107a_1" }
+networkx = { version = ">=3.1,<4", build = "py38h06a4308_0" }
+notebook = { version = ">=6.5.7,<7", build = "py38h06a4308_0" }
+notebook-shim = { version = ">=0.2.3,<0.3", build = "py38h06a4308_0" }
+nsight-compute = { version = ">=2024.1.1.4,<2025", build = "0" }
+openh264 = { version = ">=2.1.1,<3", build = "h4ff587b_0" }
+openssl = { version = ">=1.1.1w,<2", build = "h7f8727e_0" }
+packaging = ">=24.1,<25"
+pandocfilters = { version = ">=1.5.0,<2", build = "pyhd3eb1b0_0" }
+parso = { version = ">=0.8.3,<0.9", build = "pyhd3eb1b0_0" }
+pexpect = { version = ">=4.8.0,<5", build = "pyhd3eb1b0_3" }
+pickleshare = { version = ">=0.7.5,<0.8", build = "pyhd3eb1b0_1003" }
+pillow = { version = ">=9.3.0,<10", build = "py38hace64e9_1" }
+pip = { version = ">=24.2,<25", build = "py38h06a4308_0" }
+pkgutil-resolve-name = { version = ">=1.3.10,<2", build = "py38h06a4308_0" }
+preshed = { version = ">=3.0.6,<4", build = "py38h295c915_0" }
+prometheus_client = { version = ">=0.14.1,<0.15", build = "py38h06a4308_0" }
+prompt-toolkit = { version = ">=3.0.20,<4", build = "pyhd3eb1b0_0" }
+psutil = { version = ">=5.9.0,<6", build = "py38h5eee18b_0" }
+ptyprocess = { version = ">=0.7.0,<0.8", build = "pyhd3eb1b0_2" }
+pure_eval = { version = ">=0.2.2,<0.3", build = "pyhd3eb1b0_0" }
+pycparser = { version = ">=2.21,<3", build = "pyhd3eb1b0_0" }
+pygments = { version = ">=2.11.2,<3", build = "pyhd3eb1b0_0" }
+pyopenssl = { version = ">=22.0.0,<23", build = "pyhd3eb1b0_0" }
+pyparsing = { version = ">=3.1.2,<4", build = "py38h06a4308_0" }
+pyrsistent = { version = ">=0.18.0,<0.19", build = "py38heee7806_0" }
+pysocks = { version = ">=1.7.1,<2", build = "py38h06a4308_0" }
+python = { version = ">=3.8.15,<3.9", build = "h3fd9d12_0" }
+python-dateutil = { version = ">=2.8.2,<3", build = "pyhd3eb1b0_0" }
+python-fastjsonschema = { version = ">=2.16.2,<3", build = "py38h06a4308_0" }
+pytorch = ">=2.4.1,<3"
+pytorch-cuda = { version = ">=11.8,<12", build = "h7e8668a_5" }
+pytorch-mutex = { version = ">=1.0,<2", build = "cuda" }
+pytz = { version = ">=2024.1,<2025", build = "py38h06a4308_0" }
+pyzmq = { version = ">=23.2.0,<24", build = "py38h6a678d5_0" }
+readline = { version = ">=8.2,<9", build = "h5eee18b_0" }
+requests = { version = ">=2.32.3,<3", build = "py38h06a4308_0" }
+rich = { version = ">=12.5.1,<13", build = "py38h06a4308_0" }
+send2trash = { version = ">=1.8.0,<2", build = "pyhd3eb1b0_1" }
+setuptools = { version = ">=75.1.0,<76", build = "py38h06a4308_0" }
+shellingham = { version = ">=1.5.0,<2", build = "py38h06a4308_0" }
+six = { version = ">=1.16.0,<2", build = "pyhd3eb1b0_1" }
+smart_open = { version = ">=5.2.1,<6", build = "py38h06a4308_0" }
+sniffio = { version = ">=1.2.0,<2", build = "py38h06a4308_1" }
+soupsieve = { version = ">=2.5,<3", build = "py38h06a4308_0" }
+spacy = { version = ">=3.7.2,<4", build = "py38h3c18c91_0" }
+spacy-legacy = { version = ">=3.0.12,<4", build = "py38h06a4308_0" }
+spacy-loggers = { version = ">=1.0.4,<2", build = "py38h06a4308_0" }
+sqlite = { version = ">=3.40.1,<4", build = "h5082296_0" }
+srsly = { version = ">=2.4.8,<3", build = "py38h6a678d5_1" }
+stack_data = { version = ">=0.2.0,<0.3", build = "pyhd3eb1b0_0" }
+sympy = { version = ">=1.13.3,<2", build = "py38h06a4308_0" }
+terminado = { version = ">=0.17.1,<0.18", build = "py38h06a4308_0" }
+thinc = { version = ">=8.2.2,<9", build = "py38h3c18c91_0" }
+tinycss2 = { version = ">=1.2.1,<2", build = "py38h06a4308_0" }
+tk = { version = ">=8.6.12,<9", build = "h1ccaba5_0" }
+torchaudio = { version = ">=2.4.1,<3", build = "py38_cu118" }
+torchtriton = { version = ">=3.0.0,<4", build = "py38" }
+torchvision = { version = ">=0.20.0,<0.21", build = "py38_cu118" }
+tornado = { version = ">=6.4.1,<7", build = "py38h5eee18b_0" }
+traitlets = { version = ">=5.1.1,<6", build = "pyhd3eb1b0_0" }
+typer = { version = ">=0.9.0,<0.10", build = "py38h06a4308_0" }
+urllib3 = { version = ">=2.2.3,<3", build = "py38h06a4308_0" }
+wasabi = { version = ">=0.9.1,<0.10", build = "py38h06a4308_0" }
+wcwidth = { version = ">=0.2.5,<0.3", build = "pyhd3eb1b0_0" }
+weasel = { version = ">=0.3.4,<0.4", build = "py38h06a4308_0" }
+webencodings = { version = ">=0.5.1,<0.6", build = "py38_1" }
+websocket-client = { version = ">=0.58.0,<0.59", build = "py38h06a4308_4" }
+wheel = { version = ">=0.37.1,<0.38", build = "pyhd3eb1b0_0" }
+xz = { version = ">=5.4.6,<6", build = "h5eee18b_0" }
+yaml = { version = ">=0.2.5,<0.3", build = "h7b6447c_0" }
+zeromq = { version = ">=4.3.4,<5", build = "h2531618_0" }
+zipp = { version = ">=3.20.2,<4", build = "py38h06a4308_0" }
+zlib = { version = ">=1.2.13,<2", build = "h5eee18b_0" }
+zstd = { version = ">=1.5.2,<2", build = "ha4553b6_0" }
+ninja = ">=1.12.1,<2"
+
+[pypi-dependencies]
+absl-py = ">=1.4.0, <2"
+accelerate = ">=1.0.1, <2"
+aiohttp = ">=3.10.11, <4"
+aiosignal = ">=1.3.1, <2"
+annotated-types = ">=0.7.0, <0.8"
+array-record = ">=0.4.0, <0.5"
+astunparse = ">=1.6.3, <2"
+async-timeout = ">=5.0.1, <6"
+bert-score = ">=0.3.13, <0.4"
+bitsandbytes = ">=0.45.5, <0.46"
+blessed = ">=1.33.0, <2"
+bleurt-pytorch = ">=0.0.1, <0.0.2"
+cachetools = ">=5.5.2, <6"
+charset-normalizer = ">=3.4.5, <4"
+click = ">=8.1.8, <9"
+compressed-tensors = ">=0.14.0, <0.15"
+contourpy = ">=1.1.1, <2"
+cycler = ">=0.12.1, <0.13"
+dacite = ">=1.9.2, <2"
+datasets = ">=3.1.0, <4"
+dill = ">=0.3.8, <0.4"
+distro = ">=1.9.0, <2"
+dm-tree = ">=0.1.8, <0.2"
+easydict = ">=1.13, <2"
+einops = ">=0.8.1, <0.9"
+et-xmlfile = ">=2.0.0, <3"
+etils = ">=1.3.0, <2"
+evaluate = ">=0.4.6, <0.5"
+exceptiongroup = ">=1.3.1, <2"
+fairscale = ">=0.4.13, <0.5"
+fancy-einsum = ">=0.0.3, <0.0.4"
+filelock = ">=3.16.1, <4"
+fire = ">=0.7.1, <0.8"
+# flash-attn = "==2.6.1"
+flatbuffers = ">=25.12.19, <26"
+fonttools = ">=4.57.0, <5"
+frozenlist = ">=1.5.0, <2"
+fsspec = ">=2024.9.0, <2025"
+gast = ">=0.7.0, <0.8"
+geotorch = ">=0.3.0, <0.4"
+gin-config = ">=0.5.0, <0.6"
+google-auth = ">=2.49.0, <3"
+google-auth-oauthlib = ">=0.4.6, <0.5"
+google-pasta = ">=0.2.0, <0.3"
+googleapis-common-protos = ">=1.63.1, <2"
+gpustat = ">=1.1.1, <2"
+grpcio = ">=1.70.0, <2"
+h11 = ">=0.16.0, <0.17"
+h5py = ">=3.11.0, <4"
+hickle = ">=5.0.3, <6"
+httpcore = ">=1.0.9, <2"
+httpx = ">=0.28.1, <0.29"
+huggingface-hub = ">=0.36.2, <0.37"
+iniconfig = ">=2.1.0, <3"
+ipdb = ">=0.13.13, <0.14"
+jax = ">=0.4.13, <0.5"
+jiter = ">=0.9.1, <0.10"
+joblib = ">=1.4.2, <2"
+keras = ">=2.8.0, <3"
+keras-preprocessing = ">=1.1.2, <2"
+keyboard = ">=0.13.5, <0.14"
+kiwisolver = ">=1.4.7, <2"
+libclang = ">=18.1.1, <19"
+llmcompressor = ">=0.3.0, <0.4"
+llvmlite = ">=0.41.1, <0.42"
+loguru = ">=0.7.3, <0.8"
+loralib = ">=0.1.2, <0.2"
+markdown = ">=3.7, <4"
+matplotlib = ">=3.7.5, <4"
+mesh-tensorflow = ">=0.1.21, <0.2"
+ml-dtypes = ">=0.2.0, <0.3"
+multidict = ">=6.1.0, <7"
+multiprocess = ">=0.70.16, <0.71"
+ninja = ">=1.13.0, <2"
+nltk = ">=3.9.1, <4"
+numba = ">=0.58.1, <0.59"
+numpy = ">=1.24.4, <2"
+nvidia-ml-py = ">=13.590.48, <14"
+oauthlib = ">=3.3.1, <4"
+openai = ">=2.2.0, <3"
+openpyxl = ">=3.1.5, <4"
+opt-einsum = ">=3.4.0, <4"
+pandas = ">=2.0.3, <3"
+pandas-stubs = ">=2.0.3.230814, <3"
+parallelformers = ">=1.2.7, <2"
+peft = ">=0.13.2, <0.14"
+plotly = ">=6.6.0, <7"
+pluggy = ">=1.5.0, <2"
+portalocker = ">=3.0.0, <4"
+promise = ">=2.3, <3"
+protobuf = ">=3.19.6, <4"
+pyarrow = ">=17.0.0, <18"
+pyarrow-hotfix = ">=0.7, <0.8"
+pyasn1 = ">=0.6.2, <0.7"
+pyasn1-modules = ">=0.4.2, <0.5"
+pydantic = ">=2.10.6, <3"
+pydantic-core = ">=2.27.2, <3"
+pynndescent = ">=0.6.0, <0.7"
+pynvml = ">=11.5.3, <12"
+pytest = ">=8.3.5, <9"
+pyyaml = ">=6.0.3, <7"
+regex = ">=2024.11.6, <2025"
+requests-oauthlib = ">=2.0.0, <3"
+responses = ">=0.26.0, <0.27"
+rouge-score = ">=0.1.2, <0.2"
+rsa = ">=4.9.1, <5"
+sacrebleu = ">=2.5.1, <3"
+sacremoses = ">=0.1.1, <0.2"
+safetensors = ">=0.5.3, <0.6"
+scikit-learn = ">=1.3.2, <2"
+scipy = ">=1.10.1, <2"
+seaborn = ">=0.13.2, <0.14"
+sentencepiece = ">=0.2.0, <0.3"
+t5 = ">=0.9.4, <0.10"
+tabulate = ">=0.9.0, <0.10"
+tenacity = ">=9.0.0, <10"
+tensorboard = ">=2.8.0, <3"
+tensorboard-data-server = ">=0.6.1, <0.7"
+tensorflow = ">=2.8.4, <3"
+tensorflow-datasets = ">=4.9.0, <5"
+tensorflow-estimator = ">=2.8.0, <3"
+tensorflow-hub = ">=0.16.1, <0.17"
+tensorflow-io-gcs-filesystem = ">=0.34.0, <0.35"
+tensorflow-metadata = ">=1.13.0, <2"
+tensorflow-text = ">=2.8.2, <3"
+termcolor = ">=2.4.0, <3"
+tf-slim = ">=1.1.0, <2"
+tfds-nightly = ">=4.9.0.dev202304110044, <5"
+threadpoolctl = ">=3.5.0, <4"
+tiktoken = ">=0.7.0, <0.8"
+tokenizers = ">=0.20.3, <0.21"
+toml = ">=0.10.2, <0.11"
+tomli = ">=2.4.0, <3"
+tqdm = ">=4.67.3, <5"
+transformers = ">=4.46.3, <5"
+tsne-torch = ">=1.0.1, <2"
+types-pytz = ">=2024.2.0.20241221, <2025"
+typing-extensions = ">=4.13.2, <5"
+tzdata = ">=2025.3, <2026"
+umap-learn = ">=0.5.7, <0.6"
+werkzeug = ">=3.0.6, <4"
+wrapt = ">=2.0.1, <3"
+xxhash = ">=3.6.0, <4"
+yarl = ">=1.15.2, <2"
+
+
+
+# flash-attn = { version = ">=2.8", extras = ["no-build-isolation"] }
+
+# anyio = { version = ">=3.5.0,<4", build = "py38h06a4308_0" }
+# argon2-cffi = { version = ">=21.3.0,<22", build = "pyhd3eb1b0_0" }
+# argon2-cffi-bindings = { version = ">=21.2.0,<22", build = "py38h7f8727e_0" }
+# asttokens = { version = ">=2.0.5,<3", build = "pyhd3eb1b0_0" }
+# attrs = { version = ">=24.2.0,<25", build = "py38h06a4308_0" }
+# babel = { version = ">=2.9.1,<3", build = "pyhd3eb1b0_0" }
+# backcall = { version = ">=0.2.0,<0.3", build = "pyhd3eb1b0_0" }
+# beautifulsoup4 = { version = ">=4.12.3,<5", build = "py38h06a4308_0" }
+# bleach = { version = ">=4.1.0,<5", build = "pyhd3eb1b0_0" }
+# brotlipy = { version = ">=0.7.0,<0.8", build = "py38h27cfd23_1003" }
+# bzip2 = { version = ">=1.0.8,<2", build = "h7b6447c_0" }
+# catalogue = { version = ">=2.0.10,<3", build = "py38h06a4308_0" }
+# certifi = { version = ">=2024.8.30,<2025", build = "py38h06a4308_0" }
+# cffi = { version = ">=1.15.1,<2", build = "py38h74dc2b5_0" }
+# cloudpathlib = { version = ">=0.16.0,<0.17", build = "py38h06a4308_1" }
+# colorama = { version = ">=0.4.6,<0.5", build = "py38h06a4308_0" }
+# commonmark = { version = ">=0.9.1,<0.10", build = "pyhd3eb1b0_0" }
+# confection = { version = ">=0.1.4,<0.2", build = "py38h2f386ee_0" }
+# cryptography = { version = ">=38.0.4,<39", build = "py38h9ce1e76_0" }
+# cuda = { version = ">=11.6.2,<12", build = "0" }
+# cymem = { version = ">=2.0.6,<3", build = "py38h295c915_0" }
+# cython-blis = { version = ">=0.7.9,<0.8", build = "py38h7deecbd_0" }
+# dataclasses = { version = ">=0.8,<0.9", build = "pyh6d0b6a4_7" }
+# debugpy = { version = ">=1.5.1,<2", build = "py38h295c915_0" }
+# decorator = { version = ">=5.1.1,<6", build = "pyhd3eb1b0_0" }
+# defusedxml = { version = ">=0.7.1,<0.8", build = "pyhd3eb1b0_0" }
+# entrypoints = { version = ">=0.4,<0.5", build = "py38h06a4308_0" }
+# executing = { version = ">=0.8.3,<0.9", build = "pyhd3eb1b0_0" }
+# ffmpeg = { version = ">=4.3,<5", build = "hf484d3e_0" }
+# freetype = { version = ">=2.12.1,<3", build = "h4a9f257_0" }
+# future = { version = ">=0.18.3,<0.19", build = "py38h06a4308_0" }
+# gds-tools = { version = ">=1.9.1.3,<2", build = "0" }
+# giflib = { version = ">=5.2.1,<6", build = "h7b6447c_0" }
+# gmp = { version = ">=6.2.1,<7", build = "h295c915_3" }
+# gmpy2 = { version = ">=2.1.2,<3", build = "py38heeb90bb_0" }
+# gnutls = { version = ">=3.6.15,<4", build = "he1e5248_0" }
+# icu = { version = ">=58.2,<59", build = "he6710b0_3" }
+# idna = { version = ">=3.7,<4", build = "py38h06a4308_0" }
+# importlib-metadata = { version = ">=7.0.1,<8", build = "py38h06a4308_0" }
+# importlib_resources = { version = ">=5.2.0,<6", build = "pyhd3eb1b0_1" }
+# intel-openmp = { version = ">=2021.4.0,<2022", build = "h06a4308_3561" }
+# ipykernel = { version = ">=6.15.2,<7", build = "py38h06a4308_0" }
+# ipython = { version = ">=8.8.0,<9", build = "py38h06a4308_0" }
+# ipython_genutils = { version = ">=0.2.0,<0.3", build = "pyhd3eb1b0_1" }
+# jedi = { version = ">=0.18.1,<0.19", build = "py38h06a4308_1" }
+# jinja2 = { version = ">=3.1.4,<4", build = "py38h06a4308_0" }
+# jpeg = { version = ">=9e,<10a", build = "h7f8727e_0" }
+# json5 = { version = ">=0.9.6,<0.10", build = "pyhd3eb1b0_0" }
+# jsonschema = { version = ">=4.23.0,<5", build = "py38h06a4308_0" }
+# jupyter_client = { version = ">=7.4.9,<8", build = "py38h06a4308_0" }
+# jupyter_core = { version = ">=4.11.2,<5", build = "py38h06a4308_0" }
+# jupyter_server = { version = ">=1.23.4,<2", build = "py38h06a4308_0" }
+# jupyterlab = { version = ">=3.5.3,<4", build = "py38h06a4308_0" }
+# jupyterlab_pygments = { version = ">=0.1.2,<0.2", build = "py_0" }
+# jupyterlab_server = { version = ">=2.16.3,<3", build = "py38h06a4308_0" }
+# lame = { version = ">=3.100,<4", build = "h7b6447c_0" }
+# langcodes = { version = ">=3.3.0,<4", build = "pyhd3eb1b0_0" }
+# lcms2 = { version = ">=2.12,<3", build = "h3be6417_0" }
+# ld_impl_linux-64 = { version = ">=2.38,<3", build = "h1181459_1" }
+# lerc = { version = ">=3.0,<4", build = "h295c915_0" }
+# llvm-openmp = { version = ">=14.0.6,<15", build = "h9e868ea_0" }
+# lxml = { version = ">=4.9.1,<5", build = "py38h1edc446_0" }
+# lz4-c = { version = ">=1.9.3,<2", build = "h295c915_1" }
+# markupsafe = { version = ">=2.1.1,<3", build = "py38h7f8727e_0" }
+# matplotlib-inline = { version = ">=0.1.6,<0.2", build = "py38h06a4308_0" }
+# mistune = { version = ">=0.8.4,<0.9", build = "py38h7b6447c_1000" }
+# mpc = { version = ">=1.1.0,<2", build = "h10f8cd9_1" }
+# mpfr = { version = ">=4.0.2,<5", build = "hb69a4c5_1" }
+# mpmath = { version = ">=1.3.0,<2", build = "py38h06a4308_0" }
+# murmurhash = { version = ">=1.0.7,<2", build = "py38h295c915_0" }
+# nbclassic = { version = ">=1.1.0,<2", build = "py38h06a4308_0" }
+# nbclient = { version = ">=0.5.13,<0.6", build = "py38h06a4308_0" }
+# nbconvert = { version = ">=6.5.4,<7", build = "py38h06a4308_0" }
+# nbformat = { version = ">=5.9.2,<6", build = "py38h06a4308_0" }
+# ncurses = { version = ">=6.3,<7", build = "h5eee18b_3" }
+# nest-asyncio = { version = ">=1.6.0,<2", build = "py38h06a4308_0" }
+# nettle = { version = ">=3.7.3,<4", build = "hbbd107a_1" }
+# networkx = { version = ">=3.1,<4", build = "py38h06a4308_0" }
+# notebook = { version = ">=6.5.7,<7", build = "py38h06a4308_0" }
+# notebook-shim = { version = ">=0.2.3,<0.3", build = "py38h06a4308_0" }
+# nsight-compute = { version = ">=2024.1.1.4,<2025", build = "0" }
+# openh264 = { version = ">=2.1.1,<3", build = "h4ff587b_0" }
+# pandocfilters = { version = ">=1.5.0,<2", build = "pyhd3eb1b0_0" }
+# parso = { version = ">=0.8.3,<0.9", build = "pyhd3eb1b0_0" }
+# pexpect = { version = ">=4.8.0,<5", build = "pyhd3eb1b0_3" }
+# pickleshare = { version = ">=0.7.5,<0.8", build = "pyhd3eb1b0_1003" }
+# pillow = { version = ">=9.3.0,<10", build = "py38hace64e9_1" }
+# pip = { version = ">=24.2,<25", build = "py38h06a4308_0" }
+# pkgutil-resolve-name = { version = ">=1.3.10,<2", build = "py38h06a4308_0" }
+# preshed = { version = ">=3.0.6,<4", build = "py38h295c915_0" }
+# prometheus_client = { version = ">=0.14.1,<0.15", build = "py38h06a4308_0" }
+# prompt-toolkit = { version = ">=3.0.20,<4", build = "pyhd3eb1b0_0" }
+# psutil = { version = ">=5.9.0,<6", build = "py38h5eee18b_0" }
+# ptyprocess = { version = ">=0.7.0,<0.8", build = "pyhd3eb1b0_2" }
+# pure_eval = { version = ">=0.2.2,<0.3", build = "pyhd3eb1b0_0" }
+# pycparser = { version = ">=2.21,<3", build = "pyhd3eb1b0_0" }
+# pygments = { version = ">=2.11.2,<3", build = "pyhd3eb1b0_0" }
+# pyopenssl = { version = ">=22.0.0,<23", build = "pyhd3eb1b0_0" }
+# pyparsing = { version = ">=3.1.2,<4", build = "py38h06a4308_0" }
+# pyrsistent = { version = ">=0.18.0,<0.19", build = "py38heee7806_0" }
+# pysocks = { version = ">=1.7.1,<2", build = "py38h06a4308_0" }
+
+# python-dateutil = { version = ">=2.8.2,<3", build = "pyhd3eb1b0_0" }
+# python-fastjsonschema = { version = ">=2.16.2,<3", build = "py38h06a4308_0" }
+# pytorch = ">=2.4.1,<3"
+# pytorch-cuda = { version = ">=11.8,<12", build = "h7e8668a_5" }
+# pytorch-mutex = { version = ">=1.0,<2", build = "cuda" }
+# pytz = { version = ">=2024.1,<2025", build = "py38h06a4308_0" }
+# pyzmq = { version = ">=23.2.0,<24", build = "py38h6a678d5_0" }
+# readline = { version = ">=8.2,<9", build = "h5eee18b_0" }
+# requests = { version = ">=2.32.3,<3", build = "py38h06a4308_0" }
+# rich = { version = ">=12.5.1,<13", build = "py38h06a4308_0" }
+# send2trash = { version = ">=1.8.0,<2", build = "pyhd3eb1b0_1" }
+# setuptools = { version = ">=75.1.0,<76", build = "py38h06a4308_0" }
+# shellingham = { version = ">=1.5.0,<2", build = "py38h06a4308_0" }
+# six = { version = ">=1.16.0,<2", build = "pyhd3eb1b0_1" }
+# smart_open = { version = ">=5.2.1,<6", build = "py38h06a4308_0" }
+# sniffio = { version = ">=1.2.0,<2", build = "py38h06a4308_1" }
+# soupsieve = { version = ">=2.5,<3", build = "py38h06a4308_0" }
+# spacy = { version = ">=3.7.2,<4", build = "py38h3c18c91_0" }
+# spacy-legacy = { version = ">=3.0.12,<4", build = "py38h06a4308_0" }
+# spacy-loggers = { version = ">=1.0.4,<2", build = "py38h06a4308_0" }
+# sqlite = { version = ">=3.40.1,<4", build = "h5082296_0" }
+# srsly = { version = ">=2.4.8,<3", build = "py38h6a678d5_1" }
+# stack_data = { version = ">=0.2.0,<0.3", build = "pyhd3eb1b0_0" }
+# sympy = { version = ">=1.13.3,<2", build = "py38h06a4308_0" }
+# terminado = { version = ">=0.17.1,<0.18", build = "py38h06a4308_0" }
+# thinc = { version = ">=8.2.2,<9", build = "py38h3c18c91_0" }
+# tinycss2 = { version = ">=1.2.1,<2", build = "py38h06a4308_0" }
+# tk = { version = ">=8.6.12,<9", build = "h1ccaba5_0" }
+# torchaudio = { version = ">=2.4.1,<3", build = "py38_cu118" }
+# torchtriton = { version = ">=3.0.0,<4", build = "py38" }
+# torchvision = { version = ">=0.20.0,<0.21", build = "py38_cu118" }
+# tornado = { version = ">=6.4.1,<7", build = "py38h5eee18b_0" }
+# traitlets = { version = ">=5.1.1,<6", build = "pyhd3eb1b0_0" }
+# typer = { version = ">=0.9.0,<0.10", build = "py38h06a4308_0" }
+# urllib3 = { version = ">=2.2.3,<3", build = "py38h06a4308_0" }
+# wasabi = { version = ">=0.9.1,<0.10", build = "py38h06a4308_0" }
+# wcwidth = { version = ">=0.2.5,<0.3", build = "pyhd3eb1b0_0" }
+# weasel = { version = ">=0.3.4,<0.4", build = "py38h06a4308_0" }
+# webencodings = { version = ">=0.5.1,<0.6", build = "py38_1" }
+# websocket-client = { version = ">=0.58.0,<0.59", build = "py38h06a4308_4" }
+# wheel = { version = ">=0.37.1,<0.38", build = "pyhd3eb1b0_0" }
+# xz = { version = ">=5.4.6,<6", build = "h5eee18b_0" }
+# yaml = { version = ">=0.2.5,<0.3", build = "h7b6447c_0" }
+# zeromq = { version = ">=4.3.4,<5", build = "h2531618_0" }
+# zipp = { version = ">=3.20.2,<4", build = "py38h06a4308_0" }
+# zlib = { version = ">=1.2.13,<2", build = "h5eee18b_0" }
+# zstd = { version = ">=1.5.2,<2", build = "ha4553b6_0" }
+# ninja = ">=1.12.1,<2"
+
+# [pypi-dependencies]
+# absl-py = ">=1.4.0, <2"
+# accelerate = ">=1.0.1, <2"
+# aiohttp = ">=3.10.11, <4"
+# aiosignal = ">=1.3.1, <2"
+# annotated-types = ">=0.7.0, <0.8"
+# array-record = ">=0.4.0, <0.5"
+# astunparse = ">=1.6.3, <2"
+# async-timeout = ">=5.0.1, <6"
+# bert-score = ">=0.3.13, <0.4"
+# bitsandbytes = ">=0.45.5, <0.46"
+# blessed = ">=1.33.0, <2"
+# bleurt-pytorch = ">=0.0.1, <0.0.2"
+# cachetools = ">=5.5.2, <6"
+# charset-normalizer = ">=3.4.5, <4"
+# click = ">=8.1.8, <9"
+# compressed-tensors = ">=0.14.0, <0.15"
+# contourpy = ">=1.1.1, <2"
+# cycler = ">=0.12.1, <0.13"
+# dacite = ">=1.9.2, <2"
+# datasets = ">=3.1.0, <4"
+# dill = ">=0.3.8, <0.4"
+# distro = ">=1.9.0, <2"
+# dm-tree = ">=0.1.8, <0.2"
+# easydict = ">=1.13, <2"
+# einops = ">=0.8.1, <0.9"
+# et-xmlfile = ">=2.0.0, <3"
+# etils = ">=1.3.0, <2"
+# evaluate = ">=0.4.6, <0.5"
+# exceptiongroup = ">=1.3.1, <2"
+# fairscale = ">=0.4.13, <0.5"
+# fancy-einsum = ">=0.0.3, <0.0.4"
+# filelock = ">=3.16.1, <4"
+# fire = ">=0.7.1, <0.8"
+# # flash-attn = "==2.6.1"
+# flatbuffers = ">=25.12.19, <26"
+# fonttools = ">=4.57.0, <5"
+# frozenlist = ">=1.5.0, <2"
+# fsspec = ">=2024.9.0, <2025"
+# gast = ">=0.7.0, <0.8"
+# geotorch = ">=0.3.0, <0.4"
+# gin-config = ">=0.5.0, <0.6"
+# google-auth = ">=2.49.0, <3"
+# google-auth-oauthlib = ">=0.4.6, <0.5"
+# google-pasta = ">=0.2.0, <0.3"
+# googleapis-common-protos = ">=1.63.1, <2"
+# gpustat = ">=1.1.1, <2"
+# grpcio = ">=1.70.0, <2"
+# h11 = ">=0.16.0, <0.17"
+# h5py = ">=3.11.0, <4"
+# hickle = ">=5.0.3, <6"
+# httpcore = ">=1.0.9, <2"
+# httpx = ">=0.28.1, <0.29"
+# huggingface-hub = ">=0.36.2, <0.37"
+# iniconfig = ">=2.1.0, <3"
+# ipdb = ">=0.13.13, <0.14"
+# jax = ">=0.4.13, <0.5"
+# jiter = ">=0.9.1, <0.10"
+# joblib = ">=1.4.2, <2"
+# keras = ">=2.8.0, <3"
+# keras-preprocessing = ">=1.1.2, <2"
+# keyboard = ">=0.13.5, <0.14"
+# kiwisolver = ">=1.4.7, <2"
+# libclang = ">=18.1.1, <19"
+# llmcompressor = ">=0.3.0, <0.4"
+# llvmlite = ">=0.41.1, <0.42"
+# loguru = ">=0.7.3, <0.8"
+# loralib = ">=0.1.2, <0.2"
+# markdown = ">=3.7, <4"
+# matplotlib = ">=3.7.5, <4"
+# mesh-tensorflow = ">=0.1.21, <0.2"
+# ml-dtypes = ">=0.2.0, <0.3"
+# multidict = ">=6.1.0, <7"
+# multiprocess = ">=0.70.16, <0.71"
+# ninja = ">=1.13.0, <2"
+# nltk = ">=3.9.1, <4"
+# numba = ">=0.58.1, <0.59"
+# numpy = ">=1.24.4, <2"
+# nvidia-ml-py = ">=13.590.48, <14"
+# oauthlib = ">=3.3.1, <4"
+# openai = ">=2.2.0, <3"
+# openpyxl = ">=3.1.5, <4"
+# opt-einsum = ">=3.4.0, <4"
+# pandas = ">=2.0.3, <3"
+# pandas-stubs = ">=2.0.3.230814, <3"
+# parallelformers = ">=1.2.7, <2"
+# peft = ">=0.13.2, <0.14"
+# plotly = ">=6.6.0, <7"
+# pluggy = ">=1.5.0, <2"
+# portalocker = ">=3.0.0, <4"
+# promise = ">=2.3, <3"
+# protobuf = ">=3.19.6, <4"
+# pyarrow = ">=17.0.0, <18"
+# pyarrow-hotfix = ">=0.7, <0.8"
+# pyasn1 = ">=0.6.2, <0.7"
+# pyasn1-modules = ">=0.4.2, <0.5"
+# pydantic = ">=2.10.6, <3"
+# pydantic-core = ">=2.27.2, <3"
+# pynndescent = ">=0.6.0, <0.7"
+# pynvml = ">=11.5.3, <12"
+# pytest = ">=8.3.5, <9"
+# pyyaml = ">=6.0.3, <7"
+# regex = ">=2024.11.6, <2025"
+# requests-oauthlib = ">=2.0.0, <3"
+# responses = ">=0.26.0, <0.27"
+# rouge-score = ">=0.1.2, <0.2"
+# rsa = ">=4.9.1, <5"
+# sacrebleu = ">=2.5.1, <3"
+# sacremoses = ">=0.1.1, <0.2"
+# safetensors = ">=0.5.3, <0.6"
+# scikit-learn = ">=1.3.2, <2"
+# scipy = ">=1.10.1, <2"
+# seaborn = ">=0.13.2, <0.14"
+# sentencepiece = ">=0.2.0, <0.3"
+# t5 = ">=0.9.4, <0.10"
+# tabulate = ">=0.9.0, <0.10"
+# tenacity = ">=9.0.0, <10"
+# tensorboard = ">=2.8.0, <3"
+# tensorboard-data-server = ">=0.6.1, <0.7"
+# tensorflow = ">=2.8.4, <3"
+# tensorflow-datasets = ">=4.9.0, <5"
+# tensorflow-estimator = ">=2.8.0, <3"
+# tensorflow-hub = ">=0.16.1, <0.17"
+# tensorflow-io-gcs-filesystem = ">=0.34.0, <0.35"
+# tensorflow-metadata = ">=1.13.0, <2"
+# tensorflow-text = ">=2.8.2, <3"
+# termcolor = ">=2.4.0, <3"
+# tf-slim = ">=1.1.0, <2"
+# tfds-nightly = ">=4.9.0.dev202304110044, <5"
+# threadpoolctl = ">=3.5.0, <4"
+# tiktoken = ">=0.7.0, <0.8"
+# tokenizers = ">=0.20.3, <0.21"
+# toml = ">=0.10.2, <0.11"
+# tomli = ">=2.4.0, <3"
+# tqdm = ">=4.67.3, <5"
+# transformers = ">=4.46.3, <5"
+# tsne-torch = ">=1.0.1, <2"
+# types-pytz = ">=2024.2.0.20241221, <2025"
+# typing-extensions = ">=4.13.2, <5"
+# tzdata = ">=2025.3, <2026"
+# umap-learn = ">=0.5.7, <0.6"
+# werkzeug = ">=3.0.6, <4"
+# wrapt = ">=2.0.1, <3"
+# xxhash = ">=3.6.0, <4"
+# yarl = ">=1.15.2, <2"
+
+[workspace]
+channels = ["conda-forge", "pytorch", "nvidia", "main"]
+name = "tsv"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+# [tasks]
+# gen = "python tsv_main.py --gene --model-name llama3.2-3B  --dataset-name tqa --most-likely --num-gene 1  > gen.log 2>&1 &"
+
+[system-requirements]
+cuda = "12.9"
+
+[dependencies]
+python = "==3.12"
+cuda-version = ">=12.8,<13"
+pytorch-gpu = ">=2.10.0"
+torchaudio = ">=2.10.0"
+torchvision = ">=0.25.0"
+torchtriton = ">=3.1.0,<4"
+transformers = "==4.57.6"
+datasets = "==4.8.3"
+numpy = "==2.4.3"
+scipy = "==1.17.0"
+scikit-learn = "==1.8.0"
+matplotlib = "==3.10.8"
+pandas = "==3.0.1"
+tokenizers = "==0.22.2"
+safetensors = "==0.7.0"
+bitsandbytes = "==0.49.1"
+jupyterlab = "==4.5.3"
+ipython = ">=8.0.0,<9"
+pytest = "==9.0.2"
+pip = "==26.0.1"
+wandb = ">=0.25.1"
+setuptools = "==82.0.1"
+wheel = "==0.46.3"
+ninja = "==1.13.0"
+packaging = "==26.0"
+xformers = "==0.0.34"
+typer = ">=0.24.0,<0.25"
+googletrans = ">=2.4.0,<3"
+
+[pypi-dependencies]
+accelerate = ">=1.13.0, <2"
+huggingface-hub = ">=0.36.0, <2"
+bleurt-pytorch = ">=0.0.1, <0.0.2"

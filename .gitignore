@@ -1,0 +1,12 @@
+# pixi environments
+.pixi
+!.pixi/config.toml
+__pycache__
+.ruff_cache
+save_for_evals
+
+temp*
+tmp*
+TSV_*
+wandb
+*.log

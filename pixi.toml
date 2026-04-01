@@ -1,0 +1,46 @@
+[workspace]
+channels = ["conda-forge", "pytorch", "nvidia", "main"]
+name = "tsv"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+# [tasks]
+# gen = "python tsv_main.py --gene --model-name llama3.2-3B  --dataset-name tqa --most-likely --num-gene 1  > gen.log 2>&1 &"
+
+[system-requirements]
+cuda = "12.9"
+
+[dependencies]
+python = "==3.12"
+cuda-version = ">=12.8,<13"
+pytorch-gpu = ">=2.10.0"
+torchaudio = ">=2.10.0"
+torchvision = ">=0.25.0"
+torchtriton = ">=3.1.0,<4"
+transformers = "==4.43.1"
+datasets = "==4.8.3"
+numpy = ">=1.17,<2.0"
+scipy = "==1.17.0"
+scikit-learn = "==1.8.0"
+matplotlib = "==3.10.8"
+pandas = "==3.0.1"
+tokenizers = ">=0.19,<0.20"
+safetensors = "==0.7.0"
+bitsandbytes = "==0.49.1"
+jupyterlab = "==4.5.3"
+ipython = ">=8.0.0,<9"
+pytest = "==9.0.2"
+pip = "==26.0.1"
+wandb = ">=0.25.1,<0.26"
+setuptools = "==82.0.1"
+wheel = "==0.46.3"
+ninja = "==1.13.0"
+packaging = "==26.0"
+typer = ">=0.24.0,<0.25"
+googletrans = ">=2.4.0,<3"
+flash-attn = "==2.8.3"
+
+[pypi-dependencies]
+accelerate = ">=1.13.0, <2"
+huggingface-hub = ">=0.36.0, <2"
+bleurt-pytorch = ">=0.0.1, <0.0.2"
