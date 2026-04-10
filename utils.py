@@ -63,7 +63,7 @@ def get_last_non_padded_token_rep(hidden_states, attention_mask):
     Get the last non-padded token's representation for each sequence in the batch.
     """
     # Find the length of each sequence by summing the attention mask (1 for real tokens, 0 for padding)
-    lengths = attention_mask.squeeze().sum(dim=1).long()
+    lengths = attention_mask.squeeze(1).sum(dim=1).long()
 
     # Index the last non-padded token for each sequence
     batch_size, max_seq_len, hidden_size = hidden_states.size()
@@ -90,31 +90,32 @@ def get_ex_data(
     num_samples = len(prompts)
 
     with torch.no_grad():
-        with autocast(device_type="cuda", dtype=torch.bfloat16):
-            for batch_start in tqdm(range(0, num_samples, batch_size)):
-                batch_prompts = prompts[batch_start : batch_start + batch_size]
-                batch_labels = labels[batch_start : batch_start + batch_size]
-                batch_prompts, batch_labels = collate_fn(batch_prompts, batch_labels)
-                attention_mask = (batch_prompts != 0).half()
-                batch_prompts = batch_prompts.cuda()
-                batch_labels = batch_labels.cuda()
-                attention_mask = attention_mask.to(batch_prompts.device)
-                all_labels.append(batch_labels.cpu().numpy())
+            with autocast(device_type="cuda", dtype=torch.float16):
+                for batch_start in tqdm(range(0, num_samples, batch_size)):
+                    batch_prompts = prompts[batch_start : batch_start + batch_size]
+                    batch_labels = labels[batch_start : batch_start + batch_size]
+                    batch_prompts, batch_labels = collate_fn(batch_prompts, batch_labels)
+                    attention_mask = (batch_prompts != 0).half()
+                    batch_prompts = batch_prompts.cuda()
+                    batch_labels = batch_labels.cuda()
+                    attention_mask = attention_mask.to(batch_prompts.device)
+                    all_labels.append(batch_labels.cpu().numpy())
 
-                output = model(
-                    batch_prompts.squeeze(),
-                    attention_mask=attention_mask.squeeze(),
-                    output_hidden_states=True,
-                )
-                hidden_states = output.hidden_states
+                    # Use the base model to skip the expensive LM head/logits calculation
+                    base_model = model.model if hasattr(model, "model") else model
+                    output = base_model(
+                        batch_prompts.squeeze(1),
+                        attention_mask=attention_mask.squeeze(1),
+                        output_hidden_states=True,
+                    )
 
-                hidden_states = torch.stack(hidden_states, dim=0).squeeze()
-                last_layer_hidden_state = hidden_states[-1]
+                    # Access the last layer directly from the tuple to save memory
+                    last_layer_hidden_state = output.hidden_states[-1]
 
-                last_token_rep = get_last_non_padded_token_rep(
-                    last_layer_hidden_state, attention_mask.squeeze()
-                )
-                all_embeddings.append(last_token_rep)
+                    last_token_rep = get_last_non_padded_token_rep(
+                        last_layer_hidden_state, attention_mask.squeeze(1)
+                    )
+                    all_embeddings.append(last_token_rep)
 
             all_embeddings = F.normalize(torch.concat(all_embeddings), p=2, dim=-1)
 
@@ -137,7 +138,7 @@ def get_ex_data(
 def compute_ot_loss_cos(last_token_rep, centroids, pseudo_label, batch_size, args):
     last_token_rep = F.normalize(last_token_rep, p=2, dim=-1)
 
-    centroids = F.normalize(centroids, p=2, dim=-1)
+    centroids = F.normalize(centroids, p=2, dim=-1).to(last_token_rep.dtype)
 
     similarities = torch.matmul(last_token_rep, centroids.T)
 
@@ -145,6 +146,8 @@ def compute_ot_loss_cos(last_token_rep, centroids, pseudo_label, batch_size, arg
 
     pt = F.softmax(similarities, dim=-1)
 
+    # Ensure pseudo_label is on same device as pt
+    pseudo_label = pseudo_label.to(pt.device)
     ot_loss = -torch.sum(pseudo_label * torch.log(pt + 1e-8)) / pseudo_label.shape[0]
 
     return ot_loss, similarities
@@ -153,7 +156,7 @@ def compute_ot_loss_cos(last_token_rep, centroids, pseudo_label, batch_size, arg
 def compute_entropy(last_token_rep, centroids, pseudo_label, k, cls_dist, args):
     last_token_rep = F.normalize(last_token_rep, p=2, dim=-1)
 
-    centroids = F.normalize(centroids, p=2, dim=-1)
+    centroids = F.normalize(centroids, p=2, dim=-1).to(last_token_rep.dtype)
 
     similarities = torch.matmul(last_token_rep, centroids.T)
 
@@ -201,10 +204,13 @@ def update_centroids_ema(centroids, last_token_rep, pseudo_label, args):
 
     centroids = F.normalize(centroids, p=2, dim=1)
 
+    # Ensure pseudo_label is on same device as last_token_rep_norm
+    pseudo_label = pseudo_label.to(last_token_rep_norm.device)
     weighted_sum = torch.matmul(pseudo_label.T, last_token_rep_norm)
 
     # Normalize the weighted sums to get the new centroids
     pseudo_label_sum = pseudo_label.sum(dim=0).unsqueeze(1) + 1e-8
+
     new_centroids_batch = weighted_sum / pseudo_label_sum
 
     # EMA update for centroids
@@ -212,7 +218,7 @@ def update_centroids_ema(centroids, last_token_rep, pseudo_label, args):
         args.ema_decay * centroids + (1 - args.ema_decay) * new_centroids_batch,
         p=2,
         dim=1,
-    )
+    ).to(centroids.dtype)
 
     return updated_centroids
 
@@ -228,6 +234,8 @@ def update_centroids_ema_hard(centroids, last_token_rep, pseudo_label, args):
 
     discrete_labels[torch.arange(pseudo_label.size(0)), max_indices] = 1
 
+    # Ensure all tensors are on same device
+    discrete_labels = discrete_labels.to(last_token_rep_norm.device)
     weighted_sum = torch.matmul(discrete_labels.T.float(), last_token_rep_norm)
 
     pseudo_label_sum = discrete_labels.sum(dim=0).unsqueeze(1) + 1e-8
@@ -239,6 +247,6 @@ def update_centroids_ema_hard(centroids, last_token_rep, pseudo_label, args):
         args.ema_decay * centroids + (1 - args.ema_decay) * new_centroids_batch,
         p=2,
         dim=-1,
-    )
+    ).to(centroids.dtype)
 
     return updated_centroids

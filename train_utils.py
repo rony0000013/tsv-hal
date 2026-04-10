@@ -10,6 +10,7 @@ from utils import (
 import numpy as np
 import pandas as pd
 import torch
+import os
 from tqdm import tqdm
 from transformers import PreTrainedModel, AutoTokenizer
 from sklearn.metrics import roc_auc_score
@@ -30,7 +31,22 @@ def clean_answer(prompt: str, dataset_name: str) -> str:
         else:
             return prompt
     else:
-        return prompt.split("Answer:")[1]
+        if "A:" in prompt:
+            return prompt.split("A:")[1]
+        elif "Answer:" in prompt:
+            return prompt.split("Answer:")[1]
+        else:
+            return prompt
+
+
+def setup_multi_device():
+    """Setup multi-device configuration with model parallelism if available"""
+    num_gpus = torch.cuda.device_count()
+    
+    # Use single GPU to avoid conflicts with Accelerate hooks
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"Using single GPU setup: {device} (Avoiding Accelerate conflicts)")
+    return [device], device, False, "single"
 
 
 def train_model(
@@ -44,6 +60,14 @@ def train_model(
     qa_dicts: (Dict, Dict, Dict),
     args: Args,
 ):
+    # Setup multi-device configuration
+    model_devices, data_device, use_multi_device, device_mode = setup_multi_device()
+    primary_model_device = model_devices[0]
+    
+    # Use single device to avoid Accelerate conflicts
+    # Don't move the model - let Accelerate handle device placement
+    print(f"Using single device setup: Letting Accelerate manage device placement")
+    
     layer_number = -1
 
     # dir_name = f"TSV_{args.model_name}_{args.dataset_name}/exemplar_num_{args.num_exemplars}_num_selected_data_{args.num_selected_data}/{args.component}/{args.str_layer}/{args.lam}"
@@ -77,18 +101,26 @@ def train_model(
 
     scaler = GradScaler(device=device)
 
+    # Get model device from Accelerate-managed model
+    if hasattr(model, 'module'):
+        hidden_size = model.module.config.hidden_size
+        model_device = next(model.module.parameters()).device
+    else:
+        hidden_size = model.config.hidden_size
+        model_device = next(model.parameters()).device
+
     # Initialize Sinkhorn algorithm
     args.num_iters_sk = 3
     args.epsilon_sk = 0.05
 
     ex_hallu = (num_exemplars - exemplar_labels[:num_exemplars].sum()) / num_exemplars
     ex_true = (exemplar_labels[:num_exemplars].sum()) / num_exemplars
-    cls_dist = torch.tensor([ex_hallu, ex_true]).float().cuda()
+    cls_dist = torch.tensor([ex_hallu, ex_true]).float().to(model_device)
     cls_dist = cls_dist.view(-1, 1)
     sinkhorn = SinkhornKnopp_imb(args, cls_dist)
 
-    # Initialize Centroids
-    centroids = torch.randn((2, model.config.hidden_size)).half().cuda()
+    # Initialize Centroids - will be moved to match model output device dynamically
+    centroids = torch.randn((2, hidden_size)).half()
     centroids = F.normalize(centroids, p=2, dim=1)
 
     exemplar_prompts_ = exemplar_prompts
@@ -109,26 +141,27 @@ def train_model(
             batch_labels = exemplar_labels[batch_start : batch_start + batch_size]
             attention_mask = (batch_prompts != 0).half()
 
-            batch_prompts = batch_prompts.to(device)
-            batch_labels = batch_labels.to(device)
-            attention_mask = attention_mask.to(device)
-
-            with autocast(device_type="cuda", dtype=torch.bfloat16):
-                output = model(
-                    batch_prompts.squeeze(),
-                    attention_mask=attention_mask.squeeze(),
+            batch_prompts = batch_prompts.to(model_device)
+            batch_labels = batch_labels.to(model_device)
+            attention_mask = attention_mask.to(model_device)
+            
+            with autocast(device_type="cuda", dtype=torch.float16):
+                # Use the base model to skip the massive LM head/logits calculation
+                base_model = model.model if hasattr(model, "model") else model
+                output = base_model(
+                    batch_prompts.squeeze(1),
+                    attention_mask=attention_mask.squeeze(1),
                     output_hidden_states=True,
                 )
 
-                hidden_states = output.hidden_states
-                hidden_states = torch.stack(hidden_states, dim=0).squeeze()
-                # Shape: [batch_size, max_seq_len, hidden_size]
-                last_layer_hidden_state = hidden_states[layer_number]
-
+                # Index the hidden_states tuple directly instead of stacking to save GBs of VRAM
+                last_layer_hidden_state = output.hidden_states[layer_number]
                 # Use attention mask to ignore padding tokens, and get the last non-padded token's representation
                 last_token_rep = get_last_non_padded_token_rep(
-                    last_layer_hidden_state, attention_mask.squeeze()
+                    last_layer_hidden_state, attention_mask.squeeze(1)
                 )
+                # Move centroids to same device as last_token_rep
+                centroids = centroids.to(last_token_rep.device)
                 batch_labels_oh = torch.nn.functional.one_hot(
                     batch_labels, num_classes=-1
                 )
@@ -155,7 +188,7 @@ def train_model(
         epoch_loss = running_loss / total
 
         if (epoch + 1) % 1 == 0:
-            test_predictions, test_labels_combined = test_model(
+            test_predictions, test_labels_combined, df = test_model(
                 model,
                 tokenizer,
                 centroids,
@@ -167,7 +200,7 @@ def train_model(
                 layer_number,
                 args.dir_name,
                 args.dataset_name,
-                False,
+                (epoch + 1) == num_epochs,
             )
             test_auroc = roc_auc_score(
                 test_labels_combined.cpu().numpy(), test_predictions.cpu().numpy()
@@ -176,6 +209,8 @@ def train_model(
             if test_auroc > best_test_auroc:
                 best_test_auroc = test_auroc
 
+            if (epoch + 1) == num_epochs and df is not None:
+                wandb.log({"test_predictions": wandb.Table(dataframe=df)})
             wandb.log(
                 {
                     "train1/loss": epoch_loss,
@@ -220,13 +255,15 @@ def train_model(
     exemplar_labels = torch.nn.functional.one_hot(
         exemplar_label.to(torch.int64), num_classes=2
     )
+    # Move selected_labels to same device as exemplar_labels
+    selected_labels = selected_labels.to(model_device)
     augmented_labels_label = torch.concat(
-        (selected_labels, exemplar_labels.clone().cuda())
+        (selected_labels, exemplar_labels.clone().to(model_device))
     )
 
     num_samples = len(augmented_prompts_train)
 
-    with autocast(device_type="cuda", dtype=torch.bfloat16):
+    with autocast(device_type="cuda", dtype=torch.float16):
         for epoch in range(num_epochs):
             running_loss = 0.0
             total = 0
@@ -248,27 +285,27 @@ def train_model(
                 # Shape: [batch_size, max_seq_len]
                 attention_mask = (batch_prompts != 0).half()
 
-                batch_prompts = batch_prompts.to(device)
-                batch_labels = batch_labels.to(device)
-                attention_mask = attention_mask.to(device)
-
-                output = model(
-                    batch_prompts.squeeze(),
-                    attention_mask=attention_mask.squeeze(),
+                batch_prompts = batch_prompts.to(primary_model_device)
+                batch_labels = batch_labels.to(primary_model_device)
+                attention_mask = attention_mask.to(primary_model_device)
+                
+                # Use the base model to skip the massive LM head/logits calculation
+                base_model = model.model if hasattr(model, "model") else model
+                output = base_model(
+                    batch_prompts.squeeze(1),
+                    attention_mask=attention_mask.squeeze(1),
                     output_hidden_states=True,
                 )
 
-                hidden_states = output.hidden_states
-
-                # Stack hidden states and get the last layer's hidden state
-                hidden_states = torch.stack(hidden_states, dim=0).squeeze()
-                # Shape: [batch_size, max_seq_len, hidden_size]
-                last_layer_hidden_state = hidden_states[layer_number]
+                # Index the hidden_states tuple directly instead of stacking to save GBs of VRAM
+                last_layer_hidden_state = output.hidden_states[layer_number]
                 # Use attention mask to ignore padding tokens, and get the last non-padded token's representation
                 # Shape: [batch_size, hidden_size]
                 last_token_rep = get_last_non_padded_token_rep(
-                    last_layer_hidden_state, attention_mask.squeeze()
+                    last_layer_hidden_state, attention_mask.squeeze(1)
                 )
+                # Move centroids to same device as last_token_rep
+                centroids = centroids.to(last_token_rep.device)
                 ot_loss, similarities = compute_ot_loss_cos(
                     last_token_rep, centroids, batch_labels, batch_size, args
                 )
@@ -293,7 +330,7 @@ def train_model(
 
             with torch.no_grad():
                 if epoch % 1 == 0:
-                    test_predictions, test_labels_combined = test_model(
+                    test_predictions, test_labels_combined, df = test_model(
                         model,
                         tokenizer,
                         centroids,
@@ -304,12 +341,14 @@ def train_model(
                         batch_size,
                         layer_number,
                         args.dir_name,
-                        args.dataset_name(epoch + 1) == num_epochs,
+                        args.dataset_name,
+                        (epoch + 1) == num_epochs,
                     )
                     test_auroc = roc_auc_score(test_labels_combined, test_predictions)
 
             # print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}")
-
+            if (epoch + 1) == num_epochs and df is not None:
+                wandb.log({"test_predictions": wandb.Table(dataframe=df)})
             if test_auroc > best_test_auroc:
                 best_test_auroc = test_auroc
 
@@ -324,6 +363,16 @@ def train_model(
                 }
             )
 
+    wandb.log({
+        "centroids": wandb.Histogram(centroids.cpu().numpy()),
+        "centroids_mean": centroids.mean().item(),
+        "centroids_std": centroids.std().item(),
+        "num_centroids": centroids.shape[0],
+        "final/best_auroc": best_test_auroc,
+        "final/layer_number": args.str_layer,
+        "final/component": args.component,
+        "final/lam": args.lam
+    })
     torch.save(centroids, f"{args.dir_name}/centroids.pt")
     torch.save(
         {
@@ -338,6 +387,8 @@ def train_model(
         f"{args.dir_name}/tsv_checkpoint.pt",
     )
 
+
+    wandb.finish()
     return best_test_auroc
 
 
@@ -354,7 +405,7 @@ def test_model(
     dir_name: str,
     dataset_name: str,
     last_epoch=False,
-):
+) -> (torch.Tensor, torch.Tensor, pd.DataFrame):
     model.eval()
     val_predictions = []
     val_labels_combined = []
@@ -366,27 +417,33 @@ def test_model(
     num_val_samples = len(test_prompts)
 
     with torch.no_grad():
-        with autocast(device_type="cuda", dtype=torch.bfloat16):
+        with autocast(device_type="cuda", dtype=torch.float16):
             for batch_start in range(0, num_val_samples, batch_size):
                 batch_prompts = test_prompts[batch_start : batch_start + batch_size]
                 batch_labels = test_labels[batch_start : batch_start + batch_size]
                 batch_prompts, batch_labels = collate_fn(batch_prompts, batch_labels)
 
-                attention_mask = (batch_prompts != 0).half().to(device)
-                batch_prompts = batch_prompts.to(device)
-                batch_labels = batch_labels.to(device)
-
-                # Forward pass
-                output = model(
-                    batch_prompts.squeeze(),
-                    attention_mask=attention_mask.squeeze(),
+                # Get model device for test function
+                if hasattr(model, 'module'):
+                    test_model_device = next(model.module.parameters()).device
+                else:
+                    test_model_device = next(model.parameters()).device
+                    
+                attention_mask = (batch_prompts != 0).half().to(test_model_device)
+                batch_prompts = batch_prompts.to(test_model_device)
+                batch_labels = batch_labels.to(test_model_device)
+                
+                # Forward pass - use the base model to skip the expensive LM head/logits calculation
+                base_model = model.model if hasattr(model, "model") else model
+                output = base_model(
+                    batch_prompts.squeeze(1),
+                    attention_mask=attention_mask.squeeze(1),
                     output_hidden_states=True,
                 )
-                hidden_states = output.hidden_states
-                hidden_states = torch.stack(hidden_states, dim=0).squeeze()
-                last_layer_hidden_state = hidden_states[layer_number]
+                # Index the hidden_states tuple directly instead of stacking to save GBs of VRAM
+                last_layer_hidden_state = output.hidden_states[layer_number]
                 last_token_rep = get_last_non_padded_token_rep(
-                    last_layer_hidden_state, attention_mask.squeeze()
+                    last_layer_hidden_state, attention_mask.squeeze(1)
                 )
 
                 # all_last_token_reps.append(
@@ -395,9 +452,11 @@ def test_model(
                 # all_labels.append(batch_labels.cpu().numpy())
 
                 last_token_rep = F.normalize(last_token_rep, p=2, dim=-1)
+                # Move centroids to same device as last_token_rep
+                centroids = centroids.to(last_token_rep.device)
                 centroids = F.normalize(centroids, p=2, dim=-1)
 
-                with autocast(device_type="cuda", dtype=torch.bfloat16):
+                with autocast(device_type="cuda", dtype=torch.float16):
                     # Shape: [256, 2]
                     similarities = torch.matmul(last_token_rep, centroids.T)
 
@@ -454,4 +513,5 @@ def test_model(
         df = pd.DataFrame(rows_list)
         df.to_csv(f"{dir_name}/predictions.csv", index=False)
         print("Saved predictions csv")
-    return val_predictions, val_labels_combined
+        return val_predictions, val_labels_combined, df
+    return val_predictions, val_labels_combined, None

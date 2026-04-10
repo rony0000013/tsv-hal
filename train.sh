@@ -1,2 +1,7 @@
-CUDA_VISIBLE_DEVICES=0 pixi run python tsv_main.py --train --model-name sarvam-1  --dataset-name hindi_tqa --most-likely --batch-size 8 > train.log 2>&1 &
-
+MODEL_NAME="sarvam-1"
+DATASET_NAME="hindi_tqa"
+DATA_PATH="TSV_"$MODEL_NAME"_"$DATASET_NAME"_9"
+BATCH_SIZE=8
+set -a && source .env && pixi run python tsv_main.py --train --model-name $MODEL_NAME --dataset-name $DATASET_NAME --most-likely --batch-size $BATCH_SIZE > $DATA_PATH/train.log 2>&1 &
+TRAIN_PID=$!
+echo "Process started with PID: $TRAIN_PID"

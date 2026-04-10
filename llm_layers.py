@@ -34,7 +34,7 @@ class LlamaDecoderLayerWrapper(nn.Module):
         # Forward pass through the input layer norm
         hidden_states = self.llama_decoder_layer.input_layernorm(hidden_states)
 
-        if self.model_name == "qwen2.5-7B":
+        if self.model_name in ["qwen2.5-7B", "qwen-2.5-3b"]:
             hidden_states, self_attn_weights, present_key_value = (
                 self.llama_decoder_layer.self_attn(
                     hidden_states=hidden_states,
@@ -47,7 +47,7 @@ class LlamaDecoderLayerWrapper(nn.Module):
                     **kwargs,
                 )
             )
-        elif self.model_name in ["param-1", "param-1-i"]:
+        elif self.model_name in ["param-1", "param-1-2.9b"]:
             hidden_states, self_attn_weights, present_key_value = (
                 self.llama_decoder_layer.self_attn(
                     hidden_states=hidden_states,

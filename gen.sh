@@ -1,2 +1,7 @@
-CUDA_VISIBLE_DEVICES=0 pixi run python tsv_main.py --gene --model-name llama3.2-3B  --dataset-name hindi_tqa --most-likely --num-gene 1  > gen.log 2>&1 &
-
+MODEL_NAME="bharatgpt-3b"
+DATASET_NAME="hindi_tqa"
+DATA_PATH="TSV_"$MODEL_NAME"_"$DATASET_NAME"_9"
+mkdir -p $DATA_PATH
+set -a && source .env && pixi run python tsv_main.py --gene --model-name $MODEL_NAME  --dataset-name $DATASET_NAME --most-likely --num-gene 1  > $DATA_PATH/gen.log 2>&1 &
+GEN_PID=$!
+echo "Process started with PID: $GEN_PID"

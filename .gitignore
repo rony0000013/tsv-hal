@@ -10,3 +10,8 @@ tmp*
 TSV_*
 wandb
 *.log
+
+# Environment files
+.env
+.env.local
+.env.*.local

@@ -22,6 +22,12 @@ def seed_everything(seed: int):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
 
+def get_instruction(dataset_name: str):
+    if dataset_name == "hindi_tqa":
+        return "प्रश्न का उत्तर संक्षेप में कुछ वाक्यों में दें। प्रश्न: {} उत्तर:"
+    else:
+        return "Answer the question concisely within a few sentences. Question: {} Answer:"
+
 
 def clean_generated_text(decoded: str, question: str, model_name: str) -> str:
     """Clean up generated text to remove repetitions and format issues."""
@@ -70,17 +76,17 @@ def generate_answers(
     dir_name: str,
 ):
     tokenizer = AutoTokenizer.from_pretrained(
-        "bharatgenai/Param-1" if model_name == "param-1-i" else model_name_or_path,
+        "bharatgenai/Param-1" if model_name == "param-1-2.9b" else model_name_or_path,
         trust_remote_code=False,
-        attn_implementation="flash_attention_2",
+        attn_implementation="eager" if model_name == "param-1-2.9b" else "sdpa",
     )
     model = AutoModelForCausalLM.from_pretrained(
         model_name_or_path,
         low_cpu_mem_usage=True,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float16,
         trust_remote_code=True,
         device_map="auto",
-        attn_implementation="flash_attention_2",
+        attn_implementation="eager" if model_name == "param-1-2.9b" else "sdpa",
     )
 
     if tokenizer.pad_token is None:
@@ -106,7 +112,7 @@ def generate_answers(
             else "Answer the question concisely within a few sentences. Question: {} Aanswer:"
         )
 
-        if model_name in ["param-1-i", "param-1", "sarvam"]:
+        if model_name in ["sarvam-1", "qwen-2.5-3b", "bharatgpt-3b"]:
             conversation = [
                 {
                     "role": "user",
@@ -269,23 +275,30 @@ def generate_ground_truth(
 
 
 def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
-    device = torch.device("cuda")
-    tokenizer_model = (
-        "bharatgenai/Param-1" if args.model_name == "param-1-i" else model_name_or_path
-    )
+    import os
+    print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')}")
+    print(f"torch.cuda.is_available(): {torch.cuda.is_available()}")
+    print(f"torch.cuda.device_count(): {torch.cuda.device_count()}")
+    if torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    
     tokenizer = AutoTokenizer.from_pretrained(
-        tokenizer_model,
-        attn_implementation="flash_attention_2",
+        "bharatgenai/Param-1" if args.model_name == "param-1-2.9b" else model_name_or_path,
+        attn_implementation="eager" if args.model_name == "param-1-2.9b" else "sdpa",
         trust_remote_code=False,
     )
     model = AutoModelForCausalLM.from_pretrained(
         model_name_or_path,
         low_cpu_mem_usage=True,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float16,
         trust_remote_code=True,
         device_map="auto",
         token="",
-        attn_implementation="flash_attention_2",
+        attn_implementation="eager" if args.model_name == "param-1-2.9b" else "sdpa",
     )
 
     if tokenizer.pad_token is None:
@@ -297,6 +310,7 @@ def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     prompts = []
     qa_dicts = []
     length = len(dataset)
+    instruction = get_instruction(args.dataset_name)
 
     for i in tqdm(range(length)):
         question = dataset[i]["question"]
@@ -313,7 +327,7 @@ def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
 
         for anw in answers:
             prompt = tokenizer(
-                f"Answer the question concisely. Q: {question}" + " A:" + anw,
+                f"{instruction.format(question)} {anw}",
                 return_tensors="pt",
             ).input_ids.cuda()
 
@@ -410,22 +424,19 @@ def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
 def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     device = torch.device("cuda")
 
-    tokenizer_model = (
-        "bharatgenai/Param-1" if args.model_name == "param-1-i" else model_name_or_path
-    )
     tokenizer = AutoTokenizer.from_pretrained(
-        tokenizer_model,
-        attn_implementation="flash_attention_2",
+        "bharatgenai/Param-1" if args.model_name == "param-1-2.9b" else model_name_or_path,
+        attn_implementation="eager" if args.model_name == "param-1-2.9b" else "sdpa",
         trust_remote_code=False,
     )
     model = AutoModelForCausalLM.from_pretrained(
         model_name_or_path,
         low_cpu_mem_usage=True,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float16,
         trust_remote_code=True,
         device_map="auto",
         token="",
-        attn_implementation="flash_attention_2",
+        attn_implementation="eager" if args.model_name == "param-1-2.9b" else "sdpa",
     )
 
     if tokenizer.pad_token is None:
@@ -437,6 +448,7 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     prompts = []
     qa_dicts = []
     length = len(dataset)
+    instruction = get_instruction(args.dataset_name)
 
     for i in tqdm(range(length)):
         question = dataset[i]["question"]
@@ -453,7 +465,7 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
 
         for anw in answers:
             prompt = tokenizer(
-                f"Answer the question concisely. Q: {question}" + " A:" + anw,
+                f"{instruction.format(question)} {anw}",
                 return_tensors="pt",
             ).input_ids.cuda()
 
@@ -530,17 +542,30 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
 
 
 HF_NAMES = {
-    "llama3.2-3B": "meta-llama/Llama-3.2-3B",
-    "llama3.1-8B": "meta-llama/Meta-Llama-3.1-8B",
-    "qwen2.5-7B": "Qwen/Qwen2.5-7B",
-    "param-1": "bharatgenai/Param-1",
-    "param-1-i": "bharatgenai/Param-1-2.9B-Instruct",
-    "sarvam-1": "sarvamai/sarvam-1",
+    # "llama3.2-3B": "meta-llama/Llama-3.2-3B",
+    # "llama3.1-8B": "meta-llama/Meta-Llama-3.1-8B",
+    # "qwen2.5-7B": "Qwen/Qwen2.5-7B",
+    # "param-1": "bharatgenai/Param-1",
+    # "param-1-i": "bharatgenai/Param-1-2.9B-Instruct",
+    # "sarvam-1": "sarvamai/sarvam-1",
+    "bharatgpt-3b": "/mnt/storage/deeksha/models/CoRover/BharatGPT-3B-Indic",
+    "qwen-3-4b": "/mnt/storage/deeksha/models/Qwen/Qwen3-4B",
+    "qwen-3.5-2b": "/mnt/storage/deeksha/models/Qwen/Qwen3.5-2B",
+    "qwen-2.5-3b": "/mnt/storage/deeksha/models/Qwen/Qwen2.5-3B-Instruct",
+    "gemma-3-4b-it": "/mnt/storage/deeksha/models/google/gemma-3-4b-it",
+    "gemma-4-e2b-it": "/mnt/storage/deeksha/models/google/gemma-4-E2B-it",
+    "param-1-2.9b": "/mnt/storage/deeksha/models/bharatgenai/Param-1-2.9B-Instruct",
+    "sarvam-1": "/mnt/storage/deeksha/models/sarvamai/sarvam-1/",
+    "llama-3.2-3b": "/mnt/storage/deeksha/models/meta-llama/Llama-3.2-3B-Instruct",
+    "llama-3.2-1b": "/mnt/storage/deeksha/models/meta-llama/Llama-3.2-1B-Instruct",
+    "llama-3.1-8b": "/mnt/storage/deeksha/models/meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "param-1-7b": "/mnt/storage/deeksha/models/bharatgenai/Param-1-7B",
+    "krutrim-2": "/mnt/storage/deeksha/models/krutrim-ai-labs/Krutrim-2-instruct",
 }
 
 
 def main(
-    model_name: str = typer.Option("llama3.2-3B", help="Model name"),
+    model_name: str = typer.Option("llama-3.2-3B", help="Model name"),
     model_prefix: str = typer.Option("", help="Prefix of model name"),
     num_gene: int = typer.Option(1, help="Number of generations"),
     gene: bool = typer.Option(False, help="Gene flag", is_flag=True),
