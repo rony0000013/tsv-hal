@@ -22,21 +22,21 @@ import wandb
 from utils import Args
 
 
-def clean_answer(prompt: str, dataset_name: str) -> str:
-    if dataset_name == "hindi_tqa":
-        if "उत्तर:" in prompt:
-            return prompt.split("उत्तर:")[1]
-        elif "जवाब:" in prompt:
-            return prompt.split("जवाब:")[1]
-        else:
-            return prompt
-    else:
-        if "A:" in prompt:
-            return prompt.split("A:")[1]
-        elif "Answer:" in prompt:
-            return prompt.split("Answer:")[1]
-        else:
-            return prompt
+# def clean_answer(prompt: str, dataset_name: str) -> str:
+#     if dataset_name == "hindi_tqa":
+#         if "उत्तर:" in prompt:
+#             return prompt.split("उत्तर:")[1]
+#         elif "जवाब:" in prompt:
+#             return prompt.split("जवाब:")[1]
+#         else:
+#             return prompt
+#     else:
+#         if "A:" in prompt:
+#             return prompt.split("A:")[1]
+#         elif "Answer:" in prompt:
+#             return prompt.split("Answer:")[1]
+#         else:
+#             return prompt
 
 
 def setup_multi_device():
@@ -103,10 +103,18 @@ def train_model(
 
     # Get model device from Accelerate-managed model
     if hasattr(model, 'module'):
-        hidden_size = model.module.config.hidden_size
+        # Handle multimodal models like Ministral-3-3B
+        if hasattr(model.module.config, 'text_config'):
+            hidden_size = model.module.config.text_config.hidden_size
+        else:
+            hidden_size = model.module.config.hidden_size
         model_device = next(model.module.parameters()).device
     else:
-        hidden_size = model.config.hidden_size
+        # Handle multimodal models like Ministral-3-3B
+        if hasattr(model.config, 'text_config'):
+            hidden_size = model.config.text_config.hidden_size
+        else:
+            hidden_size = model.config.hidden_size
         model_device = next(model.parameters()).device
 
     # Initialize Sinkhorn algorithm
@@ -190,7 +198,6 @@ def train_model(
         if (epoch + 1) % 1 == 0:
             test_predictions, test_labels_combined, df = test_model(
                 model,
-                tokenizer,
                 centroids,
                 test_prompts,
                 test_labels,
@@ -332,7 +339,6 @@ def train_model(
                 if epoch % 1 == 0:
                     test_predictions, test_labels_combined, df = test_model(
                         model,
-                        tokenizer,
                         centroids,
                         test_prompts,
                         test_labels,
@@ -394,7 +400,6 @@ def train_model(
 
 def test_model(
     model: PreTrainedModel,
-    tokenizer: AutoTokenizer,
     centroids: torch.Tensor,
     test_prompts: List,
     test_labels: np.array,
@@ -465,30 +470,16 @@ def test_model(
                 val_predictions.append(similarity_scores.cpu())
                 val_labels_combined.append(batch_labels.cpu())
 
-                # Log input text and predictions for this batch
-                if tokenizer is not None and last_epoch is True:
+                # Log predictions for this batch
+                if last_epoch is True:
                     for i in range(batch_prompts.shape[0]):
-                        # Decode input text (remove padding tokens)
-                        input_ids = batch_prompts[
-                            i, 0
-                        ]  # Remove the extra dimension from collate_fn
-                        attention_mask_i = attention_mask[i]
-
-                        # Find the actual length (non-padding tokens)
-                        actual_length = int(attention_mask_i.sum().item())
-                        truncated_ids = (
-                            input_ids[:actual_length].cpu().numpy()
-                        )  # Convert to numpy array
-
-                        # Decode text
-                        input_text = tokenizer.decode(
-                            truncated_ids.tolist(), skip_special_tokens=True
-                        )
-
                         # Get prediction and true label
                         pred_score = similarity_scores[i].item()
                         true_label = batch_labels[i].item()
                         pred_class = 1 if pred_score >= 0.5 else 0
+
+                        # Use directly stored answer from qa_dicts (no need to decode!)
+                        stored_answer = test_qa_dicts[batch_start + i]["Answer"]
 
                         new_row = {
                             "idx": batch_start + i,
@@ -496,15 +487,11 @@ def test_model(
                             "Best Answer": test_qa_dicts[batch_start + i][
                                 "Best Answer"
                             ],
-                            "Answer": clean_answer(input_text, dataset_name),
+                            "Answer": stored_answer,
                             "Truth Label": true_label,
                             "Predicted Label": pred_class,
                         }
                         rows_list.append(new_row)
-                        # test_logs.append(f'Input: "{input_text}"')
-                        # test_logs.append(
-                        #     f"Prediction Score: {pred_score:.4f}, Predicted Class: {pred_class}, True Label: {true_label}"
-                        # )
 
     val_predictions = torch.cat(val_predictions)
     val_labels_combined = torch.cat(val_labels_combined)

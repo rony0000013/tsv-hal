@@ -29,6 +29,12 @@ class Args:
     optimizer: str
     num_iters_sk: int
     epsilon_sk: float
+    # Cross-language parameters
+    external_centroids_path: str = None
+    external_checkpoint_path: str = None
+    source_language: str = None
+    # Combined multilingual parameters
+    combine: bool = False
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():

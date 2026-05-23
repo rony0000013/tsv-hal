@@ -25,43 +25,149 @@ class LlamaDecoderLayerWrapper(nn.Module):
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
         **kwargs,
-    ) -> Tuple[
-        torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]
-    ]:
-        # Save original residual state
-        residual = hidden_states
-
-        # Forward pass through the input layer norm
-        hidden_states = self.llama_decoder_layer.input_layernorm(hidden_states)
-
-        if self.model_name in ["qwen2.5-7B", "qwen-2.5-3b"]:
-            hidden_states, self_attn_weights, present_key_value = (
-                self.llama_decoder_layer.self_attn(
-                    hidden_states=hidden_states,
-                    attention_mask=attention_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_value,
-                    output_attentions=output_attentions,
-                    use_cache=use_cache,
-                    cache_position=cache_position,
-                    **kwargs,
-                )
+    ) -> torch.FloatTensor:
+        # Ensure hidden_states is a tensor, not a tuple
+        # Handle nested tuples that might contain the tensor at different positions
+        while isinstance(hidden_states, tuple):
+            if len(hidden_states) > 0 and isinstance(hidden_states[0], torch.Tensor):
+                hidden_states = hidden_states[0]
+            else:
+                # If it's a tuple but first element is not a tensor, 
+                # try to find the tensor in the tuple
+                for item in hidden_states:
+                    if isinstance(item, torch.Tensor):
+                        hidden_states = item
+                        break
+                else:
+                    # If no tensor found, break to avoid infinite loop
+                    break
+        
+        # Ensure we have a tensor
+        if not isinstance(hidden_states, torch.Tensor):
+            raise ValueError(f"Expected torch.Tensor for hidden_states, got {type(hidden_states)}")
+        
+        # Handle different architectures
+        if self.model_name in ["olmo-3-7b"]:
+            # OLMo-3 architecture: attention first, then post_attention_layernorm
+            residual = hidden_states
+            
+            attn_output = self.llama_decoder_layer.self_attn(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+                cache_position=cache_position,
+                position_embeddings=position_embeddings,
+                **kwargs,
             )
-        elif self.model_name in ["param-1", "param-1-2.9b"]:
-            hidden_states, self_attn_weights, present_key_value = (
-                self.llama_decoder_layer.self_attn(
-                    hidden_states=hidden_states,
-                    attention_mask=attention_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_value,
-                    output_attentions=output_attentions,
-                    use_cache=use_cache,
-                    **kwargs,
-                )
-            )
+            
+            # Handle different return formats from different transformers versions
+            if isinstance(attn_output, tuple):
+                if len(attn_output) == 3:
+                    hidden_states, self_attn_weights, present_key_value = attn_output
+                elif len(attn_output) == 2:
+                    hidden_states, present_key_value = attn_output
+                    self_attn_weights = None
+                else:
+                    hidden_states = attn_output[0]
+                    self_attn_weights = None
+                    present_key_value = None
+            else:
+                # attn_output is directly the hidden_states tensor
+                hidden_states = attn_output
+                self_attn_weights = None
+                present_key_value = None
+            
+            # Apply post_attention_layernorm (OLMo-3 pattern)
+            hidden_states = self.llama_decoder_layer.post_attention_layernorm(hidden_states)
+            
+            # Add residual connection (OLMo-3 pattern)
+            hidden_states = residual.to(hidden_states.device) + hidden_states
+            
+            # Save residual for MLP
+            residual = hidden_states
+            
+            # Apply TSV layer after attention
+            hidden_states = self.tsv_layer(hidden_states)
+            
+            # Forward through MLP
+            hidden_states = self.llama_decoder_layer.mlp(hidden_states)
+            
+            # Apply post_feedforward_layernorm (OLMo-3 pattern)
+            hidden_states = self.llama_decoder_layer.post_feedforward_layernorm(hidden_states)
+            
+            # Add residual connection (OLMo-3 pattern)
+            hidden_states = residual + hidden_states
+            
+            return hidden_states
+            
         else:
-            hidden_states, self_attn_weights, present_key_value = (
-                self.llama_decoder_layer.self_attn(
+            # Llama/Qwen/Param architecture: input_layernorm first
+            # Save original residual state
+            residual = hidden_states
+
+            # Forward pass through the input layer norm
+            hidden_states = self.llama_decoder_layer.input_layernorm(hidden_states)
+
+            if self.model_name in ["qwen2.5-7B"]:
+                attn_output = self.llama_decoder_layer.self_attn(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+                cache_position=cache_position,
+                **kwargs,
+            )
+            
+                # Handle different return formats from different transformers versions
+                if isinstance(attn_output, tuple):
+                    if len(attn_output) == 3:
+                        hidden_states, self_attn_weights, present_key_value = attn_output
+                    elif len(attn_output) == 2:
+                        hidden_states, present_key_value = attn_output
+                        self_attn_weights = None
+                    else:
+                        hidden_states = attn_output[0]
+                        self_attn_weights = None
+                        present_key_value = None
+                else:
+                    # attn_output is directly the hidden_states tensor
+                    hidden_states = attn_output
+                    self_attn_weights = None
+                    present_key_value = None
+            elif self.model_name in ["param-1", "param-1-2.9b"]:
+                attn_output = self.llama_decoder_layer.self_attn(
+                    hidden_states=hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_value,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                    **kwargs,
+                )
+                
+                # Handle different return formats from different transformers versions
+                if isinstance(attn_output, tuple):
+                    if len(attn_output) == 3:
+                        hidden_states, self_attn_weights, present_key_value = attn_output
+                    elif len(attn_output) == 2:
+                        hidden_states, present_key_value = attn_output
+                        self_attn_weights = None
+                    else:
+                        hidden_states = attn_output[0]
+                        self_attn_weights = None
+                        present_key_value = None
+                else:
+                    # attn_output is directly the hidden_states tensor
+                    hidden_states = attn_output
+                    self_attn_weights = None
+                    present_key_value = None
+            else:
+                attn_output = self.llama_decoder_layer.self_attn(
                     hidden_states=hidden_states,
                     attention_mask=attention_mask,
                     position_ids=position_ids,
@@ -72,30 +178,41 @@ class LlamaDecoderLayerWrapper(nn.Module):
                     position_embeddings=position_embeddings,
                     **kwargs,
                 )
-            )
+                
+                # Handle different return formats from different transformers versions
+                if isinstance(attn_output, tuple):
+                    if len(attn_output) == 3:
+                        hidden_states, self_attn_weights, present_key_value = attn_output
+                    elif len(attn_output) == 2:
+                        hidden_states, present_key_value = attn_output
+                        self_attn_weights = None
+                    else:
+                        hidden_states = attn_output[0]
+                        self_attn_weights = None
+                        present_key_value = None
+                else:
+                    # attn_output is directly the hidden_states tensor
+                    hidden_states = attn_output
+                    self_attn_weights = None
+                    present_key_value = None
 
         # Add residual + steering vector after self-attention
-        hidden_states = residual.to(hidden_states.device) + hidden_states
+            hidden_states = residual.to(hidden_states.device) + hidden_states
 
-        # Save residual state for the MLP
-        residual = hidden_states
+            # Save residual state for the MLP
+            residual = hidden_states
 
-        # Forward pass through the post-attention layer norm and MLP
-        hidden_states = self.llama_decoder_layer.post_attention_layernorm(hidden_states)
-        hidden_states = self.llama_decoder_layer.mlp(hidden_states)
+            # Forward pass through the post-attention layer norm and MLP
+            hidden_states = self.llama_decoder_layer.post_attention_layernorm(hidden_states)
+            hidden_states = self.llama_decoder_layer.mlp(hidden_states)
 
-        # Add residual + steering vector after MLP
-        hidden_states = residual + hidden_states
-        hidden_states = self.tsv_layer(hidden_states)  # Add steering vector
+            # Add residual + steering vector after MLP
+            hidden_states = residual + hidden_states
+            hidden_states = self.tsv_layer(hidden_states)  # Add steering vector
 
-        # Return the outputs
-        outputs = (hidden_states,)
-        if output_attentions:
-            outputs += (self_attn_weights,)
-        if use_cache:
-            outputs += (present_key_value,)
-
-        return outputs
+            # Return just hidden_states like the original LlamaDecoderLayer
+            # The original layer returns a tensor, not a tuple
+            return hidden_states
 
 
 class TSVLayer(nn.Module):

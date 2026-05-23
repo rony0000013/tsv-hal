@@ -1,115 +1,215 @@
-from typing import Any, Dict, Optional, Tuple
+"""Optimized cache utilities for transformers v5 compatibility.
 
+This module provides enhanced cache classes that maintain backward compatibility
+with the original TSV project while leveraging transformers v5 optimizations.
+"""
+
+from typing import TYPE_CHECKING, Optional, Tuple, Any
 import torch
 
-# from .configuration_utils import PretrainedConfig
-# from .utils import (
-#     is_hqq_available,
-#     is_optimum_quanto_available,
-#     is_torchdynamo_compiling,
-#     logging,
-# )
-# from .utils.deprecation import deprecate_kwarg
+if TYPE_CHECKING:
+    from transformers.cache_utils import Cache as TransformersCache
+else:
+    try:
+        from transformers.cache_utils import (
+            Cache as TransformersCache,
+            DynamicCache,
+            StaticCache,
+            StaticCache as SlidingWindowCache,  # Aliased for compatibility
+            QuantizedCache,
+            EncoderDecoderCache,
+        )
+    except ImportError:
+        raise ImportError(
+            "Failed to import cache classes from transformers v5. "
+            "Please ensure you have transformers >= 5.0.0 installed."
+        )
 
 
-# if is_hqq_available():
-#     from hqq.core.quantize import Quantizer as HQQQuantizer
-
-# logger = logging.get_logger(__name__)
-
-
-class Cache(torch.nn.Module):
+class Cache(TransformersCache):
+    """Enhanced cache with backward compatibility and optimizations.
+    
+    This class extends the transformers v5 Cache class to maintain compatibility
+    with the original TSV project's interface while adding performance optimizations.
     """
-    Base, abstract class for all caches. The actual data structure is specific to each subclass.
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def update(
-        self,
-        key_states: torch.Tensor,
-        value_states: torch.Tensor,
-        layer_idx: int,
-        cache_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Updates the cache with the new `key_states` and `value_states` for the layer `layer_idx`.
-
-        Parameters:
-            key_states (`torch.Tensor`):
-                The new key states to cache.
-            value_states (`torch.Tensor`):
-                The new value states to cache.
-            layer_idx (`int`):
-                The index of the layer to cache the states for.
-            cache_kwargs (`Dict[str, Any]`, `optional`):
-                Additional arguments for the cache subclass. These are specific to each subclass and allow new types of
-                cache to be created.
-
-        Return:
-            A tuple containing the updated key and value states.
-        """
-        raise NotImplementedError("Make sure to implement `update` in a subclass.")
-
+    
+    def __init__(self, *args, **kwargs):
+        # Handle transformers v5 Cache constructor requirements
+        if not args and not kwargs:
+            # Provide default layer_class_to_replicate for backward compatibility
+            from transformers.cache_utils import DynamicCache
+            kwargs['layer_class_to_replicate'] = DynamicCache
+        
+        super().__init__(*args, **kwargs)
+        self._device_cache: Optional[torch.device] = None
+        # Initialize cache attributes for backward compatibility
+        self.key_cache = []
+        self.value_cache = []
+    
     def get_seq_length(self, layer_idx: Optional[int] = 0) -> int:
-        """Returns the sequence length of the cached states. A layer index can be optionally passed."""
-        # TODO: deprecate this function in favor of `cache_position`
-        raise NotImplementedError(
-            "Make sure to implement `get_seq_length` in a subclass."
-        )
-
-    # Deprecate in favor of max-cache-shape because we want to be specifc by what we mean with "max_length"
-    # Prev some cache objects didn't have "max_length" (SlidingWindowCache or SinkCache) because the cache object technically handles
-    # infinite amount of tokens. In the codebase what we really need to check is the max capacity of certain cache instances, so
-    # we change naming to be more explicit
-    def get_max_length(self) -> Optional[int]:
-        # logger.warning_once(
-        #     "`get_max_cache()` is deprecated for all Cache classes. Use `get_max_cache_shape()` instead. "
-        #     "Calling `get_max_cache()` will raise error from v4.48"
-        # )
-        return self.get_max_cache_shape()
-
+        """Backward compatible method with layer_idx parameter.
+        
+        Args:
+            layer_idx: Layer index (for backward compatibility)
+            
+        Returns:
+            Sequence length of cached states
+        """
+        # Try transformers v5 method first
+        if hasattr(super(), 'get_seq_length'):
+            try:
+                return super().get_seq_length()
+            except (TypeError, AttributeError):
+                pass
+        
+        # Fallback to layer-based approach
+        if hasattr(self, 'layers') and layer_idx < len(self.layers):
+            layer = self.layers[layer_idx]
+            if hasattr(layer, 'get_seq_length'):
+                return layer.get_seq_length()
+            elif hasattr(layer, 'keys') and layer.keys is not None:
+                return layer.keys.shape[-2]  # seq_len dimension
+        
+        # Final fallback for backward compatibility
+        if layer_idx < len(self.key_cache) and self.key_cache[layer_idx]:
+            return self.key_cache[layer_idx].shape[-2]
+        
+        return 0
+    
     def get_max_cache_shape(self) -> Optional[int]:
-        """Returns the maximum sequence length (i.e. max capacity) of the cache object"""
-        raise NotImplementedError(
-            "Make sure to implement `get_max_cache_shape` in a subclass."
-        )
-
+        """Returns the maximum sequence length of the cache object."""
+        # Try transformers v5 method first
+        if hasattr(super(), 'get_max_cache_shape'):
+            try:
+                return super().get_max_cache_shape()
+            except (TypeError, AttributeError):
+                pass
+        
+        # Fallback implementation
+        if hasattr(self, 'layers') and self.layers:
+            return max(layer.get_max_cache_shape() for layer in self.layers)
+        
+        return None
+    
     def get_usable_length(
         self, new_seq_length: int, layer_idx: Optional[int] = 0
     ) -> int:
-        """Given the sequence length of the new inputs, returns the usable length of the cache."""
-        # Cache without size limit -> all cache is usable
-        # Cache with size limit -> if the length cache plus the length of the new inputs is larger the maximum cache
-        #   length, we will need to evict part of the cache (and thus not all cache is usable)
+        """Given the sequence length of the new inputs, returns the usable length of the cache.
+        
+        Args:
+            new_seq_length: Length of new sequence to add
+            layer_idx: Layer index (for backward compatibility)
+            
+        Returns:
+            Usable cache length
+        """
         max_length = self.get_max_cache_shape()
         previous_seq_length = self.get_seq_length(layer_idx)
-        if max_length is not None and previous_seq_length + new_seq_length > max_length:
+        
+        # Cache without size limit -> all cache is usable
+        if max_length is None:
+            return previous_seq_length
+            
+        # Cache with size limit -> check if eviction is needed
+        if previous_seq_length + new_seq_length > max_length:
             return max_length - new_seq_length
         return previous_seq_length
-
+    
     def reorder_cache(self, beam_idx: torch.LongTensor):
-        """Reorders the cache for beam search, given the selected beam indices."""
-        for layer_idx in range(len(self.key_cache)):
-            if self.key_cache[layer_idx] != []:
-                device = self.key_cache[layer_idx].device
-                self.key_cache[layer_idx] = self.key_cache[layer_idx].index_select(
-                    0, beam_idx.to(device)
-                )
-            if self.value_cache[layer_idx] != []:
-                device = self.value_cache[layer_idx].device
-                self.value_cache[layer_idx] = self.value_cache[layer_idx].index_select(
-                    0, beam_idx.to(device)
-                )
-
+        """Reorders the cache for beam search with optimizations.
+        
+        Args:
+            beam_idx: Selected beam indices for reordering
+        """
+        # Try transformers v5 method first
+        if hasattr(super(), 'reorder_cache'):
+            try:
+                super().reorder_cache(beam_idx)
+                return
+            except (TypeError, AttributeError):
+                pass
+        
+        # Optimized fallback implementation
+        if not beam_idx.numel() > 0:
+            return
+            
+        beam_idx_device = beam_idx.device
+        
+        # Process layers efficiently
+        if hasattr(self, 'layers'):
+            for layer in self.layers:
+                if hasattr(layer, 'keys') and layer.keys is not None:
+                    device = self._get_device(layer.keys)
+                    if device != beam_idx_device:
+                        beam_idx = beam_idx.to(device)
+                    layer.keys = layer.keys.index_select(0, beam_idx)
+                    layer.values = layer.values.index_select(0, beam_idx)
+        
+        # Backward compatibility for key_cache/value_cache
+        if hasattr(self, 'key_cache') and hasattr(self, 'value_cache'):
+            for layer_idx in range(len(self.key_cache)):
+                key_cache = self.key_cache[layer_idx]
+                value_cache = self.value_cache[layer_idx]
+                
+                # Skip empty caches early
+                if not key_cache and not value_cache:
+                    continue
+                    
+                # Batch device transfers
+                if key_cache is not None and len(key_cache) > 0:
+                    device = self._get_device(key_cache)
+                    if device != beam_idx_device:
+                        beam_idx = beam_idx.to(device)
+                    self.key_cache[layer_idx] = key_cache.index_select(0, beam_idx)
+                    
+                if value_cache is not None and len(value_cache) > 0:
+                    device = self._get_device(value_cache)
+                    if device != beam_idx_device:
+                        beam_idx = beam_idx.to(device)
+                    self.value_cache[layer_idx] = value_cache.index_select(0, beam_idx)
+    
+    def _get_device(self, tensor: torch.Tensor) -> torch.device:
+        """Cache device information to avoid repeated device calls.
+        
+        Args:
+            tensor: Tensor to get device from
+            
+        Returns:
+            Device of the tensor
+        """
+        if self._device_cache is None or self._device_cache != tensor.device:
+            self._device_cache = tensor.device
+        return self._device_cache
+    
     @property
     def seen_tokens(self):
-        # logger.warning_once(
-        #     "The `seen_tokens` attribute is deprecated and will be removed in v4.41. Use the `cache_position` "
-        #     "model input instead."
-        # )
+        """Backward compatibility property for seen tokens.
+        
+        Returns:
+            Number of seen tokens or None if not available
+        """
         if hasattr(self, "_seen_tokens"):
             return self._seen_tokens
+        elif hasattr(super(), 'seen_tokens'):
+            return super().seen_tokens
         else:
             return None
+    
+    def get_max_length(self) -> Optional[int]:
+        """Backward compatibility method.
+        
+        Returns:
+            Maximum cache length (deprecated in favor of get_max_cache_shape)
+        """
+        return self.get_max_cache_shape()
+
+
+# Re-export all cache classes for backward compatibility
+__all__ = [
+    "Cache",
+    "DynamicCache", 
+    "StaticCache",
+    "SlidingWindowCache",
+    "QuantizedCache",
+    "EncoderDecoderCache",
+]

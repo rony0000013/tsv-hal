@@ -15,3 +15,6 @@ wandb
 .env
 .env.local
 .env.*.local
+
+*.pdf
+*.csv
