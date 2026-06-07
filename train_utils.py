@@ -42,7 +42,7 @@ from utils import Args
 def setup_multi_device():
     """Setup multi-device configuration with model parallelism if available"""
     num_gpus = torch.cuda.device_count()
-    
+
     # Use single GPU to avoid conflicts with Accelerate hooks
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using single GPU setup: {device} (Avoiding Accelerate conflicts)")
@@ -63,11 +63,11 @@ def train_model(
     # Setup multi-device configuration
     model_devices, data_device, use_multi_device, device_mode = setup_multi_device()
     primary_model_device = model_devices[0]
-    
+
     # Use single device to avoid Accelerate conflicts
     # Don't move the model - let Accelerate handle device placement
     print(f"Using single device setup: Letting Accelerate manage device placement")
-    
+
     layer_number = -1
 
     # dir_name = f"TSV_{args.model_name}_{args.dataset_name}/exemplar_num_{args.num_exemplars}_num_selected_data_{args.num_selected_data}/{args.component}/{args.str_layer}/{args.lam}"
@@ -77,7 +77,7 @@ def train_model(
 
     wandb.init(
         project="tsv",
-        name=f"{args.model_name}_{args.dataset_name}",
+        name=f"{args.model_name}_{args.dataset_name}_{args.thres_percentile}",
         config=args.__dict__,
     )
     logging.basicConfig(
@@ -102,16 +102,16 @@ def train_model(
     scaler = GradScaler(device=device)
 
     # Get model device from Accelerate-managed model
-    if hasattr(model, 'module'):
+    if hasattr(model, "module"):
         # Handle multimodal models like Ministral-3-3B
-        if hasattr(model.module.config, 'text_config'):
+        if hasattr(model.module.config, "text_config"):
             hidden_size = model.module.config.text_config.hidden_size
         else:
             hidden_size = model.module.config.hidden_size
         model_device = next(model.module.parameters()).device
     else:
         # Handle multimodal models like Ministral-3-3B
-        if hasattr(model.config, 'text_config'):
+        if hasattr(model.config, "text_config"):
             hidden_size = model.config.text_config.hidden_size
         else:
             hidden_size = model.config.hidden_size
@@ -152,8 +152,8 @@ def train_model(
             batch_prompts = batch_prompts.to(model_device)
             batch_labels = batch_labels.to(model_device)
             attention_mask = attention_mask.to(model_device)
-            
-            with autocast(device_type="cuda", dtype=torch.float16):
+
+            with autocast(device_type="cuda", dtype=torch.bfloat16):
                 # Use the base model to skip the massive LM head/logits calculation
                 base_model = model.model if hasattr(model, "model") else model
                 output = base_model(
@@ -270,7 +270,7 @@ def train_model(
 
     num_samples = len(augmented_prompts_train)
 
-    with autocast(device_type="cuda", dtype=torch.float16):
+    with autocast(device_type="cuda", dtype=torch.bfloat16):
         for epoch in range(num_epochs):
             running_loss = 0.0
             total = 0
@@ -295,7 +295,7 @@ def train_model(
                 batch_prompts = batch_prompts.to(primary_model_device)
                 batch_labels = batch_labels.to(primary_model_device)
                 attention_mask = attention_mask.to(primary_model_device)
-                
+
                 # Use the base model to skip the massive LM head/logits calculation
                 base_model = model.model if hasattr(model, "model") else model
                 output = base_model(
@@ -369,16 +369,18 @@ def train_model(
                 }
             )
 
-    wandb.log({
-        "centroids": wandb.Histogram(centroids.cpu().numpy()),
-        "centroids_mean": centroids.mean().item(),
-        "centroids_std": centroids.std().item(),
-        "num_centroids": centroids.shape[0],
-        "final/best_auroc": best_test_auroc,
-        "final/layer_number": args.str_layer,
-        "final/component": args.component,
-        "final/lam": args.lam
-    })
+    wandb.log(
+        {
+            "centroids": wandb.Histogram(centroids.cpu().numpy()),
+            "centroids_mean": centroids.mean().item(),
+            "centroids_std": centroids.std().item(),
+            "num_centroids": centroids.shape[0],
+            "final/best_auroc": best_test_auroc,
+            "final/layer_number": args.str_layer,
+            "final/component": args.component,
+            "final/lam": args.lam,
+        }
+    )
     torch.save(centroids, f"{args.dir_name}/centroids.pt")
     torch.save(
         {
@@ -392,7 +394,6 @@ def train_model(
         },
         f"{args.dir_name}/tsv_checkpoint.pt",
     )
-
 
     wandb.finish()
     return best_test_auroc
@@ -422,22 +423,22 @@ def test_model(
     num_val_samples = len(test_prompts)
 
     with torch.no_grad():
-        with autocast(device_type="cuda", dtype=torch.float16):
+        with autocast(device_type="cuda", dtype=torch.bfloat16):
             for batch_start in range(0, num_val_samples, batch_size):
                 batch_prompts = test_prompts[batch_start : batch_start + batch_size]
                 batch_labels = test_labels[batch_start : batch_start + batch_size]
                 batch_prompts, batch_labels = collate_fn(batch_prompts, batch_labels)
 
                 # Get model device for test function
-                if hasattr(model, 'module'):
+                if hasattr(model, "module"):
                     test_model_device = next(model.module.parameters()).device
                 else:
                     test_model_device = next(model.parameters()).device
-                    
+
                 attention_mask = (batch_prompts != 0).half().to(test_model_device)
                 batch_prompts = batch_prompts.to(test_model_device)
                 batch_labels = batch_labels.to(test_model_device)
-                
+
                 # Forward pass - use the base model to skip the expensive LM head/logits calculation
                 base_model = model.model if hasattr(model, "model") else model
                 output = base_model(
@@ -461,7 +462,7 @@ def test_model(
                 centroids = centroids.to(last_token_rep.device)
                 centroids = F.normalize(centroids, p=2, dim=-1)
 
-                with autocast(device_type="cuda", dtype=torch.float16):
+                with autocast(device_type="cuda", dtype=torch.bfloat16):
                     # Shape: [256, 2]
                     similarities = torch.matmul(last_token_rep, centroids.T)
 

@@ -25,9 +25,9 @@ plt.savefig('ablation_chart.pdf')
 plt.close()
 
 # Calculate Differences (Delta = Test Language AUROC - Original AUROC)
-df['English Diff'] = df['English'] - df['Original AUROC']
-df['Hindi Diff'] = df['Hindi'] - df['Original AUROC']
-df['Bengali Diff'] = df['Bengali'] - df['Original AUROC']
+# df['English Diff'] = df['English'] 
+# df['Hindi Diff'] = df['Hindi']
+# df['Bengali Diff'] = df['Bengali']
 
 # 2. Difference Heatmap
 # Average the difference across all models

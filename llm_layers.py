@@ -32,7 +32,7 @@ class LlamaDecoderLayerWrapper(nn.Module):
             if len(hidden_states) > 0 and isinstance(hidden_states[0], torch.Tensor):
                 hidden_states = hidden_states[0]
             else:
-                # If it's a tuple but first element is not a tensor, 
+                # If it's a tuple but first element is not a tensor,
                 # try to find the tensor in the tuple
                 for item in hidden_states:
                     if isinstance(item, torch.Tensor):
@@ -41,16 +41,22 @@ class LlamaDecoderLayerWrapper(nn.Module):
                 else:
                     # If no tensor found, break to avoid infinite loop
                     break
-        
+
         # Ensure we have a tensor
         if not isinstance(hidden_states, torch.Tensor):
-            raise ValueError(f"Expected torch.Tensor for hidden_states, got {type(hidden_states)}")
-        
+            raise ValueError(
+                f"Expected torch.Tensor for hidden_states, got {type(hidden_states)}"
+            )
+
         # Handle different architectures
-        if self.model_name in ["olmo-3-7b"]:
-            # OLMo-3 architecture: attention first, then post_attention_layernorm
+        if self.model_name in ["tiny-aya-global-3b"]:
+            # Cohere2 architecture: similar to Llama but without post_attention_layernorm
             residual = hidden_states
-            
+
+            # Forward pass through the input layer norm
+            hidden_states = self.llama_decoder_layer.input_layernorm(hidden_states)
+
+            # Forward through self-attention
             attn_output = self.llama_decoder_layer.self_attn(
                 hidden_states=hidden_states,
                 attention_mask=attention_mask,
@@ -62,7 +68,56 @@ class LlamaDecoderLayerWrapper(nn.Module):
                 position_embeddings=position_embeddings,
                 **kwargs,
             )
-            
+
+            # Handle different return formats from different transformers versions
+            if isinstance(attn_output, tuple):
+                if len(attn_output) == 3:
+                    hidden_states, self_attn_weights, present_key_value = attn_output
+                elif len(attn_output) == 2:
+                    hidden_states, present_key_value = attn_output
+                    self_attn_weights = None
+                else:
+                    hidden_states = attn_output[0]
+                    self_attn_weights = None
+                    present_key_value = None
+            else:
+                hidden_states = attn_output
+                self_attn_weights = None
+                present_key_value = None
+
+            # Add residual connection
+            hidden_states = residual.to(hidden_states.device) + hidden_states
+
+            # Save residual for MLP
+            residual = hidden_states
+
+            # Apply TSV layer after attention
+            hidden_states = self.tsv_layer(hidden_states)
+
+            # Forward through MLP
+            hidden_states = self.llama_decoder_layer.mlp(hidden_states)
+
+            # Add residual connection after MLP
+            hidden_states = residual + hidden_states
+
+            return hidden_states
+
+        elif self.model_name in ["olmo-3-7b"]:
+            # OLMo-3 architecture: attention first, then post_attention_layernorm
+            residual = hidden_states
+
+            attn_output = self.llama_decoder_layer.self_attn(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+                cache_position=cache_position,
+                position_embeddings=position_embeddings,
+                **kwargs,
+            )
+
             # Handle different return formats from different transformers versions
             if isinstance(attn_output, tuple):
                 if len(attn_output) == 3:
@@ -79,30 +134,34 @@ class LlamaDecoderLayerWrapper(nn.Module):
                 hidden_states = attn_output
                 self_attn_weights = None
                 present_key_value = None
-            
+
             # Apply post_attention_layernorm (OLMo-3 pattern)
-            hidden_states = self.llama_decoder_layer.post_attention_layernorm(hidden_states)
-            
+            hidden_states = self.llama_decoder_layer.post_attention_layernorm(
+                hidden_states
+            )
+
             # Add residual connection (OLMo-3 pattern)
             hidden_states = residual.to(hidden_states.device) + hidden_states
-            
+
             # Save residual for MLP
             residual = hidden_states
-            
+
             # Apply TSV layer after attention
             hidden_states = self.tsv_layer(hidden_states)
-            
+
             # Forward through MLP
             hidden_states = self.llama_decoder_layer.mlp(hidden_states)
-            
+
             # Apply post_feedforward_layernorm (OLMo-3 pattern)
-            hidden_states = self.llama_decoder_layer.post_feedforward_layernorm(hidden_states)
-            
+            hidden_states = self.llama_decoder_layer.post_feedforward_layernorm(
+                hidden_states
+            )
+
             # Add residual connection (OLMo-3 pattern)
             hidden_states = residual + hidden_states
-            
+
             return hidden_states
-            
+
         else:
             # Llama/Qwen/Param architecture: input_layernorm first
             # Save original residual state
@@ -113,20 +172,22 @@ class LlamaDecoderLayerWrapper(nn.Module):
 
             if self.model_name in ["qwen2.5-7B"]:
                 attn_output = self.llama_decoder_layer.self_attn(
-                hidden_states=hidden_states,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                past_key_value=past_key_value,
-                output_attentions=output_attentions,
-                use_cache=use_cache,
-                cache_position=cache_position,
-                **kwargs,
-            )
-            
+                    hidden_states=hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_value,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                    cache_position=cache_position,
+                    **kwargs,
+                )
+
                 # Handle different return formats from different transformers versions
                 if isinstance(attn_output, tuple):
                     if len(attn_output) == 3:
-                        hidden_states, self_attn_weights, present_key_value = attn_output
+                        hidden_states, self_attn_weights, present_key_value = (
+                            attn_output
+                        )
                     elif len(attn_output) == 2:
                         hidden_states, present_key_value = attn_output
                         self_attn_weights = None
@@ -149,11 +210,13 @@ class LlamaDecoderLayerWrapper(nn.Module):
                     use_cache=use_cache,
                     **kwargs,
                 )
-                
+
                 # Handle different return formats from different transformers versions
                 if isinstance(attn_output, tuple):
                     if len(attn_output) == 3:
-                        hidden_states, self_attn_weights, present_key_value = attn_output
+                        hidden_states, self_attn_weights, present_key_value = (
+                            attn_output
+                        )
                     elif len(attn_output) == 2:
                         hidden_states, present_key_value = attn_output
                         self_attn_weights = None
@@ -178,11 +241,13 @@ class LlamaDecoderLayerWrapper(nn.Module):
                     position_embeddings=position_embeddings,
                     **kwargs,
                 )
-                
+
                 # Handle different return formats from different transformers versions
                 if isinstance(attn_output, tuple):
                     if len(attn_output) == 3:
-                        hidden_states, self_attn_weights, present_key_value = attn_output
+                        hidden_states, self_attn_weights, present_key_value = (
+                            attn_output
+                        )
                     elif len(attn_output) == 2:
                         hidden_states, present_key_value = attn_output
                         self_attn_weights = None
@@ -196,14 +261,16 @@ class LlamaDecoderLayerWrapper(nn.Module):
                     self_attn_weights = None
                     present_key_value = None
 
-        # Add residual + steering vector after self-attention
+            # Add residual + steering vector after self-attention
             hidden_states = residual.to(hidden_states.device) + hidden_states
 
             # Save residual state for the MLP
             residual = hidden_states
 
             # Forward pass through the post-attention layer norm and MLP
-            hidden_states = self.llama_decoder_layer.post_attention_layernorm(hidden_states)
+            hidden_states = self.llama_decoder_layer.post_attention_layernorm(
+                hidden_states
+            )
             hidden_states = self.llama_decoder_layer.mlp(hidden_states)
 
             # Add residual + steering vector after MLP

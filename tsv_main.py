@@ -10,15 +10,27 @@ from tqdm import tqdm
 import numpy as np
 import typer
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, AutoModelForMultimodalLM
+from transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    AutoModelForMultimodalLM,
+)
 from llm_layers import add_tsv_layers
 from utils import Args
 from train_utils import train_model, test_model
 
-TEMPLATE_LLMS = ["sarvam-1", "qwen-2.5-3b", "bharatgpt-3b", "gemma-3-4b-it", "olmo-3-7b", "nanda-10b"]
+TEMPLATE_LLMS = [
+    "sarvam-1",
+    "qwen-2.5-3b",
+    "bharatgpt-3b",
+    "gemma-3-4b-it",
+    "olmo-3-7b",
+    "nanda-10b",
+]
 
 # Configuration for torch.compile optimization
-USE_TORCH_COMPILE = True  # Set to False to disable torch.compile for debugging
+USE_TORCH_COMPILE = False  # Set to False to disable torch.compile for debugging
+
 
 def seed_everything(seed: int):
     random.seed(seed)
@@ -29,7 +41,8 @@ def seed_everything(seed: int):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
 
-def get_instruction(dataset_name: str, language: str = None):
+
+def get_instruction(dataset_name: str, language: str = ""):
     if dataset_name == "hindi_tqa":
         return "प्रश्न का उत्तर संक्षेप में कुछ (1-2) वाक्यों में दें। प्रश्न: {} उत्तर:"
     elif dataset_name == "ben_tqa":
@@ -65,7 +78,7 @@ def generate_answers(
         model = AutoModelForMultimodalLM.from_pretrained(
             model_name_or_path,
             low_cpu_mem_usage=True,
-            dtype=torch.float16,
+            dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="auto",
             attn_implementation="sdpa",
@@ -79,12 +92,12 @@ def generate_answers(
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
             low_cpu_mem_usage=True,
-            dtype=torch.float16,
+            dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="auto",
             attn_implementation="sdpa",
         )
-    
+
     # Apply torch.compile for performance optimization
     if USE_TORCH_COMPILE:
         try:
@@ -112,27 +125,27 @@ def generate_answers(
     instruction = get_instruction(dataset_name)
     begin_index = 0
     end_index = len(dataset)
-    
+
     # Pre-create directories
     os.makedirs(f"{dir_name}/{dataset_name}_hal_det/answers", exist_ok=True)
-    
+
     # Setup CSV file once
     info = "most_likely_" if most_likely else "batch_generations_"
     csv_path = f"{dir_name}/{dataset_name}_hal_det/{info}answer.csv"
-    csv_file = open(csv_path, 'w', newline='', encoding='utf-8')
+    csv_file = open(csv_path, "w", newline="", encoding="utf-8")
     writer = csv.writer(csv_file)
-    writer.writerow(['index', 'output'])
-    
+    writer.writerow(["index", "output"])
+
     # Batch processing variables
     batch_size = 32  # Process in batches for efficiency
     csv_batch = []
-    
+
     print(f"Generating {end_index - begin_index} answers with batch size {batch_size}")
-    
+
     for batch_start in range(begin_index, end_index, batch_size):
         batch_end = min(batch_start + batch_size, end_index)
         current_batch_size = batch_end - batch_start
-        
+
         # Process batch
         for i in range(batch_start, batch_end):
             answers = [None] * num_gene
@@ -140,7 +153,9 @@ def generate_answers(
 
             # Create prompt
             if model_name in TEMPLATE_LLMS:
-                conversation = [{"role": "user", "content": instruction.format(question)}]
+                conversation = [
+                    {"role": "user", "content": instruction.format(question)}
+                ]
                 inputs = tokenizer.apply_chat_template(
                     conversation=conversation,
                     return_tensors="pt",
@@ -148,12 +163,16 @@ def generate_answers(
                 )
                 prompt = inputs.input_ids.cuda()
             else:
-                prompt = tokenizer(instruction.format(question), return_tensors="pt").input_ids.cuda()
+                prompt = tokenizer(
+                    instruction.format(question), return_tensors="pt"
+                ).input_ids.cuda()
 
             # Generate answers
             with torch.no_grad():
-                attention_mask = torch.where(prompt == tokenizer.pad_token_id, 0, 1).long()
-                
+                attention_mask = torch.where(
+                    prompt == tokenizer.pad_token_id, 0, 1
+                ).long()
+
                 # Optimize for single generation (most common case)
                 if num_gene == 1:
                     generation_kwargs = {
@@ -164,26 +183,32 @@ def generate_answers(
                         "pad_token_id": tokenizer.pad_token_id,
                         "use_cache": True,
                     }
-                    
+
                     if most_likely:
-                        generation_kwargs.update({
-                            "num_beams": 3,
-                            "num_return_sequences": 1,
-                            "do_sample": False,
-                            "repetition_penalty": 1.2,
-                        })
+                        generation_kwargs.update(
+                            {
+                                "num_beams": 3,
+                                "num_return_sequences": 1,
+                                "do_sample": False,
+                                "repetition_penalty": 1.2,
+                            }
+                        )
                     else:
-                        generation_kwargs.update({
-                            "do_sample": True,
-                            "num_return_sequences": 1,
-                            "num_beams": 1,
-                            "temperature": 0.7,
-                            "top_p": 0.9,
-                            "repetition_penalty": 1.2,
-                        })
+                        generation_kwargs.update(
+                            {
+                                "do_sample": True,
+                                "num_return_sequences": 1,
+                                "num_beams": 1,
+                                "temperature": 0.7,
+                                "top_p": 0.9,
+                                "repetition_penalty": 1.2,
+                            }
+                        )
 
                     generated = model.generate(**generation_kwargs)
-                    decoded = tokenizer.decode(generated[0, prompt.shape[-1]:], skip_special_tokens=True).strip()
+                    decoded = tokenizer.decode(
+                        generated[0, prompt.shape[-1] :], skip_special_tokens=True
+                    ).strip()
                     answers = [decoded]
                 else:
                     # Handle multiple generations efficiently
@@ -196,25 +221,31 @@ def generate_answers(
                             "pad_token_id": tokenizer.pad_token_id,
                             "use_cache": True,
                         }
-                        
+
                         if most_likely:
-                            generation_kwargs.update({
-                                "num_beams": 5,
-                                "num_return_sequences": 1,
-                                "do_sample": False,
-                            })
+                            generation_kwargs.update(
+                                {
+                                    "num_beams": 5,
+                                    "num_return_sequences": 1,
+                                    "do_sample": False,
+                                }
+                            )
                         else:
-                            generation_kwargs.update({
-                                "do_sample": True,
-                                "num_return_sequences": 1,
-                                "num_beams": 1,
-                            })
+                            generation_kwargs.update(
+                                {
+                                    "do_sample": True,
+                                    "num_return_sequences": 1,
+                                    "num_beams": 1,
+                                }
+                            )
 
                         generated = model.generate(**generation_kwargs)
-                        decoded = tokenizer.decode(generated[0, prompt.shape[-1]:], skip_special_tokens=True).strip()
+                        decoded = tokenizer.decode(
+                            generated[0, prompt.shape[-1] :], skip_special_tokens=True
+                        ).strip()
                         answers[gen_iter] = decoded
                         del generated
-                
+
                 del attention_mask
 
             # Save answers immediately
@@ -222,10 +253,10 @@ def generate_answers(
                 f"{dir_name}/{dataset_name}_hal_det/answers/{info}hal_det_{model_name}_{dataset_name}_answers_index_{i}.npy",
                 answers,
             )
-            
+
             # Add to CSV batch
             csv_batch.append((i, decoded))
-            
+
             del prompt
             torch.cuda.empty_cache()
 
@@ -233,11 +264,13 @@ def generate_answers(
         writer.writerows(csv_batch)
         csv_file.flush()  # Ensure data is written
         csv_batch.clear()
-        
+
         # Progress update (less frequent)
         if (batch_end - begin_index) % 100 == 0 or batch_end == end_index:
-            print(f"Processed {batch_end - begin_index}/{end_index - begin_index} samples")
-    
+            print(
+                f"Processed {batch_end - begin_index}/{end_index - begin_index} samples"
+            )
+
     # Close CSV file
     csv_file.close()
     print(f"Generation complete. Results saved to {csv_path}")
@@ -252,6 +285,7 @@ def generate_ground_truth(
 ):
     # Use Google's BLEURT library for true BLEURT scoring
     from bleurt import score as bleurt_score
+
     print("Loading BLEURT scorer...")
     bleurt_scorer = bleurt_score.BleurtScorer()
     print("Using BLEURT scorer directly")
@@ -294,7 +328,7 @@ def generate_ground_truth(
             continue
 
         all_results = np.zeros((len(all_answers), len(valid_predictions)))
-        
+
         # Use true BLEURT scoring
         for anw in range(len(all_answers)):
             reference = str(all_answers[anw])
@@ -302,9 +336,14 @@ def generate_ground_truth(
                 prediction_text = str(valid_predictions[0]).strip()
                 if not prediction_text:
                     continue
-                scores = bleurt_scorer.score(references=[reference], candidates=[prediction_text])
+                scores = bleurt_scorer.score(
+                    references=[reference], candidates=[prediction_text]
+                )
             else:
-                scores = bleurt_scorer.score(references=[reference] * len(valid_predictions), candidates=valid_predictions)
+                scores = bleurt_scorer.score(
+                    references=[reference] * len(valid_predictions),
+                    candidates=valid_predictions,
+                )
             all_results[anw] = np.array(scores)
         gts = np.concatenate([gts, np.max(all_results, axis=0)], 0)
         if i % 10 == 0:
@@ -319,27 +358,32 @@ def generate_ground_truth(
 
 def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     import os
+
     print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')}")
     print(f"torch.cuda.is_available(): {torch.cuda.is_available()}")
     print(f"torch.cuda.device_count(): {torch.cuda.device_count()}")
     if torch.cuda.is_available():
         for i in range(torch.cuda.device_count()):
             print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    
+
     tokenizer = AutoTokenizer.from_pretrained(
-        "bharatgenai/Param-1" if args.model_name == "param-1-2.9b" else model_name_or_path,
-        attn_implementation="eager" if args.model_name == "param-1-2.9b" else "sdpa",
+        "bharatgenai/Param-1"
+        if args.model_name == "param-1-2.9b"
+        else model_name_or_path,
+        attn_implementation="eager"
+        if args.model_name == "param-1-2.9b"
+        else "flash_attention_2",
         trust_remote_code=False,
     )
-    
+
     if args.model_name == "ministral-3-3b":
         model = AutoModelForMultimodalLM.from_pretrained(
             model_name_or_path,
             low_cpu_mem_usage=True,
-            dtype=torch.float16,
+            dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="auto",
             token="",
@@ -349,13 +393,15 @@ def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
             low_cpu_mem_usage=True,
-            dtype=torch.float16,
+            dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="auto",
             token="",
-            attn_implementation="eager" if args.model_name == "param-1-2.9b" else "sdpa",
+            attn_implementation="eager"
+            if args.model_name == "param-1-2.9b"
+            else "flash_attention_2",
         )
-    
+
     # Apply torch.compile for training performance optimization
     if USE_TORCH_COMPILE:
         try:
@@ -368,7 +414,9 @@ def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
                 model = torch.compile(model, mode="reduce-overhead")
                 print("torch.compile applied with reduce-overhead mode for training")
             except Exception as e2:
-                print(f"torch.compile completely failed for training, using uncompiled model: {e2}")
+                print(
+                    f"torch.compile completely failed for training, using uncompiled model: {e2}"
+                )
     else:
         print("torch.compile disabled by configuration for training")
 
@@ -391,7 +439,7 @@ def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
             if args.dataset_name in ("tqa", "hindi_tqa", "ben_tqa")
             else None
         )
-        
+
         # Get language-specific instruction for combined dataset
         if args.dataset_name == "combined_tqa":
             language = dataset[i]["language"]
@@ -436,17 +484,56 @@ def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     gts = np.load(f"{args.dir_name}/ml_{args.dataset_name}_bleurt_score.npy")
     length = len(dataset)
 
-    if args.dataset_name in ("tqa", "hindi_tqa", "ben_tqa", "triviaqa", "combined_tqa"):
-        thres_gt = 0.5
-    else:
-        thres_gt = 0.2
+    # Determine ground-truth threshold. If a percentile is provided, compute threshold from BLEURT scores.
+    if args.thres_percentile is not None:
+        # # Determine exact split point based on percentile
+        # split_value = np.percentile(gts, args.thres_percentile)
 
-    gt_label = np.asarray(gts > thres_gt, dtype=np.int32)
+        # # Assign labels explicitly by percentile
+        # gt_label = np.zeros(length, dtype=np.int32)
+        # gt_label[gts >= split_value] = 1
+
+        # print(f"Using percentile split at the {args.thres_percentile}th percentile.")
+        # print(
+        #     f"Class 0 count: {np.sum(gt_label == 0)} | Class 1 count: {np.sum(gt_label == 1)}"
+        # )
+
+        # 1. Get indices that would sort the BLEURT scores
+        # Add a microscopic amount of random noise to break ties cleanly
+        noise = np.random.uniform(1e-9, 1e-8, size=gts.shape)
+        sorted_indices = np.argsort(gts + noise)
+
+        # 2. Determine exact split point based on percentile
+        split_idx = int(length * (args.thres_percentile / 100.0))
+
+        # 3. Assign labels explicitly by rank order
+        gt_label = np.zeros(length, dtype=np.int32)
+        gt_label[sorted_indices[split_idx:]] = 1
+
+        print(f"Using rank-based split at the {args.thres_percentile}th percentile.")
+        print(
+            f"Class 0 count: {np.sum(gt_label == 0)} | Class 1 count: {np.sum(gt_label == 1)}"
+        )
+    else:
+        # Preserve previous dataset-specific defaults
+        if args.dataset_name in (
+            "tqa",
+            "hindi_tqa",
+            "ben_tqa",
+            "triviaqa",
+            "combined_tqa",
+        ):
+            thres_gt = 0.5
+        else:
+            thres_gt = 0.2
+        gt_label = np.asarray(gts > thres_gt, dtype=np.int32)
 
     # Load data indices from correct location for combined dataset
     if args.dataset_name == "combined_tqa":
         index = np.load(f"{args.dir_name}/data_index_{args.dataset_name}.npy")
-        exemplar_index = np.load(f"{args.dir_name}/exemplar_idx_{args.dataset_name}.npy")
+        exemplar_index = np.load(
+            f"{args.dir_name}/exemplar_idx_{args.dataset_name}.npy"
+        )
     else:
         index = np.load(f"data_indices/data_index_{args.dataset_name}.npy")
         exemplar_index = np.load(f"data_indices/exemplar_idx_{args.dataset_name}.npy")
@@ -488,7 +575,7 @@ def train_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     qa_dicts = (test_qa_dicts, train_qa_dicts, exemplar_qa_dicts)
 
     # Handle multimodal models like Ministral-3-3B
-    if hasattr(model.config, 'text_config'):
+    if hasattr(model.config, "text_config"):
         num_layers = model.config.text_config.num_hidden_layers
         hidden_size = model.config.text_config.hidden_size
     else:
@@ -527,16 +614,20 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     device = torch.device("cuda")
 
     tokenizer = AutoTokenizer.from_pretrained(
-        "bharatgenai/Param-1" if args.model_name == "param-1-2.9b" else model_name_or_path,
-        attn_implementation="eager" if args.model_name == "param-1-2.9b" else "sdpa",
+        "bharatgenai/Param-1"
+        if args.model_name == "param-1-2.9b"
+        else model_name_or_path,
+        attn_implementation="eager"
+        if args.model_name == "param-1-2.9b"
+        else "flash_attention_2",
         trust_remote_code=False,
     )
-    
+
     if args.model_name == "ministral-3-3b":
         model = AutoModelForMultimodalLM.from_pretrained(
             model_name_or_path,
             low_cpu_mem_usage=True,
-            dtype=torch.float16,
+            dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="auto",
             token="",
@@ -546,13 +637,15 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
             low_cpu_mem_usage=True,
-            dtype=torch.float16,
+            dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="auto",
             token="",
-            attn_implementation="eager" if args.model_name == "param-1-2.9b" else "sdpa",
+            attn_implementation="eager"
+            if args.model_name == "param-1-2.9b"
+            else "flash_attention_2",
         )
-    
+
     # Apply torch.compile for testing performance optimization
     if USE_TORCH_COMPILE:
         try:
@@ -565,7 +658,9 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
                 model = torch.compile(model, mode="reduce-overhead")
                 print("torch.compile applied with reduce-overhead mode for testing")
             except Exception as e2:
-                print(f"torch.compile completely failed for testing, using uncompiled model: {e2}")
+                print(
+                    f"torch.compile completely failed for testing, using uncompiled model: {e2}"
+                )
     else:
         print("torch.compile disabled by configuration for testing")
 
@@ -588,7 +683,7 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
             if args.dataset_name in ("tqa", "hindi_tqa", "ben_tqa")
             else None
         )
-        
+
         # Get language-specific instruction for combined dataset
         if args.dataset_name == "combined_tqa":
             language = dataset[i]["language"]
@@ -633,17 +728,56 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     gts = np.load(f"{args.dir_name}/ml_{args.dataset_name}_bleurt_score.npy")
     length = len(dataset)
 
-    if args.dataset_name in ("tqa", "hindi_tqa", "ben_tqa", "triviaqa", "combined_tqa"):
-        thres_gt = 0.5
-    else:
-        thres_gt = 0.2
+    # Determine ground-truth threshold. If a percentile is provided, compute threshold from BLEURT scores.
+    if getattr(args, "thres_percentile", None) is not None:
+        # # Determine exact split point based on percentile
+        # split_value = np.percentile(gts, args.thres_percentile)
 
-    gt_label = np.asarray(gts > thres_gt, dtype=np.int32)
-    
+        # # Assign labels explicitly by percentile
+        # gt_label = np.zeros(length, dtype=np.int32)
+        # gt_label[gts >= split_value] = 1
+
+        # print(f"Using percentile split at the {args.thres_percentile}th percentile.")
+        # print(
+        #     f"Class 0 count: {np.sum(gt_label == 0)} | Class 1 count: {np.sum(gt_label == 1)}"
+        # )
+
+        # 1. Get indices that would sort the BLEURT scores
+        # Add a microscopic amount of random noise to break ties cleanly
+        noise = np.random.uniform(1e-9, 1e-8, size=gts.shape)
+        sorted_indices = np.argsort(gts + noise)
+
+        # 2. Determine exact split point based on percentile
+        split_idx = int(length * (args.thres_percentile / 100.0))
+
+        # 3. Assign labels explicitly by rank order
+        gt_label = np.zeros(length, dtype=np.int32)
+        gt_label[sorted_indices[split_idx:]] = 1
+
+        print(f"Using rank-based split at the {args.thres_percentile}th percentile.")
+        print(
+            f"Class 0 count: {np.sum(gt_label == 0)} | Class 1 count: {np.sum(gt_label == 1)}"
+        )
+    else:
+        # Preserve previous dataset-specific defaults
+        if args.dataset_name in (
+            "tqa",
+            "hindi_tqa",
+            "ben_tqa",
+            "triviaqa",
+            "combined_tqa",
+        ):
+            thres_gt = 0.5
+        else:
+            thres_gt = 0.2
+        gt_label = np.asarray(gts > thres_gt, dtype=np.int32)
+
     # Load data indices from correct location for combined dataset
     if args.dataset_name == "combined_tqa":
         index = np.load(f"{args.dir_name}/data_index_{args.dataset_name}.npy")
-        exemplar_index = np.load(f"{args.dir_name}/exemplar_idx_{args.dataset_name}.npy")
+        exemplar_index = np.load(
+            f"{args.dir_name}/exemplar_idx_{args.dataset_name}.npy"
+        )
     else:
         index = np.load(f"data_indices/data_index_{args.dataset_name}.npy")
         exemplar_index = np.load(f"data_indices/exemplar_idx_{args.dataset_name}.npy")
@@ -685,7 +819,7 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     qa_dicts = (test_qa_dicts, train_qa_dicts, exemplar_qa_dicts)
 
     # Handle multimodal models like Ministral-3-3B
-    if hasattr(model.config, 'text_config'):
+    if hasattr(model.config, "text_config"):
         num_layers = model.config.text_config.num_hidden_layers
         hidden_size = model.config.text_config.hidden_size
     else:
@@ -701,26 +835,30 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
         print(f"Loading external checkpoint from: {args.external_checkpoint_path}")
         print(f"Source language: {args.source_language}")
         print(f"Target language: {args.dataset_name}")
-        
+
         # Load external centroids
         centroids = torch.load(args.external_centroids_path)
-        
+
         # Load external checkpoint
         checkpoint = torch.load(args.external_checkpoint_path)
-        
+
         # Validate compatibility
         if centroids.shape[1] != hidden_size:
-            print(f"WARNING: Centroids dimension {centroids.shape[1]} != model hidden size {hidden_size}")
+            print(
+                f"WARNING: Centroids dimension {centroids.shape[1]} != model hidden size {hidden_size}"
+            )
             print("This may indicate incompatible model architectures.")
-            
+
         # Use checkpoint args for TSV configuration
         checkpoint_args = checkpoint["args"]
         lam = checkpoint_args.get("lam", args.lam)
         component = checkpoint_args.get("component", args.component)
         str_layer = checkpoint_args.get("str_layer", args.str_layer)
-        
-        print(f"Using TSV config from source: lam={lam}, component={component}, str_layer={str_layer}")
-        
+
+        print(
+            f"Using TSV config from source: lam={lam}, component={component}, str_layer={str_layer}"
+        )
+
     else:
         # Load complete checkpoint from current directory
         checkpoint = torch.load(f"{args.dir_name}/tsv_checkpoint.pt")
@@ -741,13 +879,9 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
 
     # Create a temporary args object for add_tsv_layers
     args_dict = args.__dict__.copy()
-    args_dict.update({
-        'lam': lam,
-        'component': component,
-        'str_layer': str_layer
-    })
+    args_dict.update({"lam": lam, "component": component, "str_layer": str_layer})
     temp_args = Args(**args_dict)
-    
+
     add_tsv_layers(model, tsv, [lam], temp_args)
 
     val_predictions, val_labels_combined, _ = test_model(
@@ -765,13 +899,15 @@ def test_fn(model_name_or_path: str, dataset: Dataset, args: Args):
     )
 
     val_predictions_np = val_predictions.cpu().numpy()
-    val_labels_np = val_labels_combined.cpu().numpy()     
-    
+    val_labels_np = val_labels_combined.cpu().numpy()
+
     auroc = roc_auc_score(val_labels_np, val_predictions_np)
     print(f"Test AUROC: {auroc:.4f}")
     print(f"Test samples: {len(val_labels_np)}")
     print(f"Label distribution: {np.bincount(val_labels_np.astype(int))}")
-    print(f"Prediction range: [{val_predictions_np.min():.3f}, {val_predictions_np.max():.3f}]")
+    print(
+        f"Prediction range: [{val_predictions_np.min():.3f}, {val_predictions_np.max():.3f}]"
+    )
 
 
 def combine_multilingual_datasets(model_name: str, str_layer: int):
@@ -781,23 +917,23 @@ def combine_multilingual_datasets(model_name: str, str_layer: int):
     """
     languages = ["tqa", "hindi_tqa", "ben_tqa"]
     combined_dir = f"TSV_{model_name}_combined_tqa_{str_layer}"
-    
+
     print(f"Creating combined multilingual dataset in {combined_dir}")
-    
+
     # Create combined directory structure
     os.makedirs(f"{combined_dir}/combined_tqa_hal_det/answers", exist_ok=True)
-    
+
     # Combine all datasets
     combined_dataset = []
     combined_qa_dicts = []
     combined_gts = []
-    
+
     # Language-agnostic instruction (use English as base)
     instruction = "Answer the question concisely within a few (1-2) sentences. Question: {} Answer:"
-    
+
     for lang_idx, lang in enumerate(languages):
         print(f"Processing {lang}...")
-        
+
         # Load dataset
         if lang == "tqa":
             dataset = load_dataset("truthful_qa", "generation")["validation"]
@@ -805,88 +941,96 @@ def combine_multilingual_datasets(model_name: str, str_layer: int):
             dataset = Dataset.from_json("hindi_truthful_qa.json")
         elif lang == "ben_tqa":
             dataset = Dataset.from_json("bengali_truthful_qa.json")
-        
+
         # Load ground truth scores
         lang_dir = f"TSV_{model_name}_{lang}_{str_layer}"
         gt_path = f"{lang_dir}/ml_{lang}_bleurt_score.npy"
-        
+
         if not os.path.exists(gt_path):
             print(f"WARNING: GT scores not found at {gt_path}")
             continue
-            
+
         gts = np.load(gt_path)
-        
+
         # Process each sample
         for i in range(len(dataset)):
             question = dataset[i]["question"]
             best_answer = dataset[i]["best_answer"]
-            category = dataset[i]["category"] if lang in ("tqa", "hindi_tqa", "ben_tqa") else None
-            
+            category = (
+                dataset[i]["category"]
+                if lang in ("tqa", "hindi_tqa", "ben_tqa")
+                else None
+            )
+
             # Copy pregenerated answers to combined directory
             src_answer_path = f"{lang_dir}/{lang}_hal_det/answers/most_likely_hal_det_{model_name}_{lang}_answers_index_{i}.npy"
             dst_answer_path = f"{combined_dir}/combined_tqa_hal_det/answers/most_likely_hal_det_{model_name}_combined_tqa_answers_index_{lang_idx * 817 + i}.npy"
-            
+
             if os.path.exists(src_answer_path):
                 answers = np.load(src_answer_path)
                 np.save(dst_answer_path, answers)
             else:
                 print(f"WARNING: Answer file not found at {src_answer_path}")
                 continue
-            
+
             # Add to combined dataset
-            combined_dataset.append({
-                "question": question,
-                "best_answer": best_answer,
-                "category": category,
-                "language": lang,
-                "original_index": i
-            })
-            
-            combined_qa_dicts.append({
-                "Question": question,
-                "Answer": answers[0] if len(answers) > 0 else "",
-                "Best Answer": best_answer,
-                "Category": category,
-                "Language": lang
-            })
-            
+            combined_dataset.append(
+                {
+                    "question": question,
+                    "best_answer": best_answer,
+                    "category": category,
+                    "language": lang,
+                    "original_index": i,
+                }
+            )
+
+            combined_qa_dicts.append(
+                {
+                    "Question": question,
+                    "Answer": answers[0] if len(answers) > 0 else "",
+                    "Best Answer": best_answer,
+                    "Category": category,
+                    "Language": lang,
+                }
+            )
+
             combined_gts.append(gts[i])
-    
+
     # Save combined GT scores
     combined_gts = np.array(combined_gts)
     np.save(f"{combined_dir}/ml_combined_tqa_bleurt_score.npy", combined_gts)
-    
+
     # Save combined dataset as JSON
     with open(f"{combined_dir}/combined_tqa_dataset.json", "w", encoding="utf-8") as f:
         json.dump(combined_dataset, f, ensure_ascii=False, indent=2)
-    
+
     # Create combined data indices
     total_samples = len(combined_dataset)
     print(f"Combined dataset created with {total_samples} samples")
-    
+
     # Generate data indices for combined dataset (similar to individual languages)
     np.random.seed(42)
     indices = np.random.permutation(total_samples)
-    
+
     # Split indices: 75% for wild (training), 25% for test
     wild_ratio = 0.75
     wild_count = int(total_samples * wild_ratio)
-    
+
     wild_indices = indices[:wild_count]
     test_indices = indices[wild_count:]
-    
+
     # Create exemplar indices from wild indices (32 per language = 96 total)
     exemplar_count_per_lang = 32
     exemplar_count = exemplar_count_per_lang * 3  # 32 * 3 languages = 96 total
-    
+
     # Ensure we don't exceed available wild indices
     exemplar_count = min(exemplar_count, len(wild_indices))
     exemplar_indices = np.random.choice(wild_indices, exemplar_count, replace=False)
-    
+
     # Save combined data indices
     np.save(f"{combined_dir}/data_index_combined_tqa.npy", indices)
     np.save(f"{combined_dir}/exemplar_idx_combined_tqa.npy", exemplar_indices)
-    
+
     print(f"Combined dataset preparation complete!")
     print(f"- Total samples: {total_samples}")
     print(f"- Wild (training) samples: {len(wild_indices)}")
@@ -902,24 +1046,26 @@ HF_NAMES = {
     # "param-1": "bharatgenai/Param-1",
     # "param-1-i": "bharatgenai/Param-1-2.9B-Instruct",
     # "sarvam-1": "sarvamai/sarvam-1",
-    "olmo-3-7b": "/mnt/storage/deeksha/models/allenai/Olmo-3-7B-Instruct",
-    "nanda-10b": "/mnt/storage/deeksha/models/Llama-3-Nanda-10B-Chat",
-    "granite-4-3b": "/mnt/storage/deeksha/models/ibm-granite/granite-4.0-micro",
-    "airavata-8b": "/mnt/storage/deeksha/models/ai4bharat/Airavata",
-    "ministral-3-3b": "/mnt/storage/deeksha/models/mistralai/Ministral-3-3B-Instruct-2512",
-    "bharatgpt-3b": "/mnt/storage/deeksha/models/CoRover/BharatGPT-3B-Indic",
-    "qwen-3-4b": "/mnt/storage/deeksha/models/Qwen/Qwen3-4B",
-    "qwen-2.5-3b": "/mnt/storage/deeksha/models/Qwen/Qwen2.5-3B-Instruct",
-    "gemma-3-4b-it": "/mnt/storage/deeksha/models/google/gemma-3-4b-it",
-    "gemma-4-e2b-it": "/mnt/storage/deeksha/models/google/gemma-4-E2B-it",
-    "param-1-2.9b": "/mnt/storage/deeksha/models/bharatgenai/Param-1-2.9B-Instruct",
-    "sarvam-1": "/mnt/storage/deeksha/models/sarvamai/sarvam-1/",
-    "llama-3.2-3b": "/mnt/storage/deeksha/models/meta-llama/Llama-3.2-3B-Instruct",
-    "llama-3.2-1b": "/mnt/storage/deeksha/models/meta-llama/Llama-3.2-1B-Instruct",
-    "llama-3.1-8b": "/mnt/storage/deeksha/models/meta-llama/Meta-Llama-3.1-8B-Instruct",
-    "param-1-7b": "/mnt/storage/deeksha/models/bharatgenai/Param-1-7B",
-    "krutrim-1-7b": "/mnt/storage/deeksha/models/krutrim-ai-labs/Krutrim-1-instruct",
-    "krutrim-2-12b": "/mnt/storage/deeksha/models/krutrim-ai-labs/Krutrim-2-instruct",
+    "olmo-3-7b": "/disk1/models/allenai/Olmo-3-7B-Instruct",
+    "nanda-10b": "/disk1/models//MBZUAI/Llama-3-Nanda-10B-Chat",
+    "granite-4-3b": "/disk1/models/ibm-granite/granite-4.0-micro",
+    "airavata-8b": "/disk1/models/ai4bharat/Airavata",
+    "ministral-3-3b": "/disk1/models/mistralai/Ministral-3-3B-Instruct-2512",
+    "bharatgpt-3b": "/disk1/models/CoRover/BharatGPT-3B-Indic",
+    "tiny-aya-global-3b": "/disk1/models/CohereLabs/tiny-aya-global",
+    "granite-4.1-8b": "/disk1/models/ibm-granite/granite-4.1-8b",
+    "qwen-3.5-4b": "/disk1/models/Qwen/Qwen3.5-4B-Base",
+    "qwen-2.5-3b": "/disk1/models/Qwen/Qwen2.5-3B-Instruct",
+    "gemma-3-4b-it": "/disk1/models/google/gemma-3-4b-it",
+    "gemma-4-e2b-it": "/disk1/models/google/gemma-4-E2B-it",
+    "param-1-2.9b": "/disk1/models/bharatgenai/Param-1-2.9B-Instruct",
+    "sarvam-1": "/disk1/models/sarvamai/sarvam-1/",
+    "llama-3.2-3b": "/disk1/models/meta-llama/Llama-3.2-3B-Instruct",
+    "llama-3.2-1b": "/disk1/models/meta-llama/Llama-3.2-1B-Instruct",
+    "llama-3.1-8b": "/disk1/models/meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "param-1-7b": "/disk1/models/bharatgenai/Param-1-7B",
+    "krutrim-1-7b": "/disk1/models/krutrim-ai-labs/Krutrim-1-instruct",
+    "krutrim-2-12b": "/disk1/models/krutrim-ai-labs/Krutrim-2-instruct",
 }
 
 
@@ -937,6 +1083,10 @@ def main(
     most_likely: bool = typer.Option(False, help="Most likely flag", is_flag=True),
     wild_ratio: float = typer.Option(0.75, help="Wild ratio"),
     thres_gt: float = typer.Option(0.5, help="Ground truth threshold"),
+    thres_percentile: float = typer.Option(
+        None,
+        help="If set, compute GT threshold as this percentile (0-100) of BLEURT scores",
+    ),
     model_dir: str = typer.Option(None, help="Local directory with model data"),
     batch_size: int = typer.Option(32, help="Batch size"),
     cos_temp: float = typer.Option(0.1, help="Cosine temperature"),
@@ -954,11 +1104,20 @@ def main(
     num_iters_sk: int = typer.Option(3, help="Number of Sinkhorn iterations"),
     epsilon_sk: float = typer.Option(0.05, help="Sinkhorn epsilon"),
     # Cross-language arguments
-    external_centroids_path: str = typer.Option(None, help="Path to external centroids file for cross-language testing"),
-    external_checkpoint_path: str = typer.Option(None, help="Path to external TSV checkpoint file for cross-language testing"),
-    source_language: str = typer.Option(None, help="Source language name for cross-language testing (e.g., 'hindi_tqa', 'ben_tqa')"),
+    external_centroids_path: str = typer.Option(
+        None, help="Path to external centroids file for cross-language testing"
+    ),
+    external_checkpoint_path: str = typer.Option(
+        None, help="Path to external TSV checkpoint file for cross-language testing"
+    ),
+    source_language: str = typer.Option(
+        None,
+        help="Source language name for cross-language testing (e.g., 'hindi_tqa', 'ben_tqa')",
+    ),
     # Combined multilingual arguments
-    combine: bool = typer.Option(False, help="Combine multilingual datasets flag", is_flag=True),
+    combine: bool = typer.Option(
+        False, help="Combine multilingual datasets flag", is_flag=True
+    ),
 ):
     model_name_or_path = HF_NAMES[model_prefix + model_name]
 
@@ -971,6 +1130,7 @@ def main(
         most_likely=most_likely,
         wild_ratio=wild_ratio,
         thres_gt=thres_gt,
+        thres_percentile=thres_percentile,
         model_dir=model_dir,
         batch_size=batch_size,
         cos_temp=cos_temp,
@@ -1023,10 +1183,12 @@ def main(
         # Load combined multilingual dataset
         combined_dir = f"TSV_{model_name}_combined_tqa_{str_layer}"
         dataset_path = f"{combined_dir}/combined_tqa_dataset.json"
-        
+
         if not os.path.exists(dataset_path):
-            raise ValueError(f"Combined dataset not found at {dataset_path}. Please run with --combine flag first.")
-        
+            raise ValueError(
+                f"Combined dataset not found at {dataset_path}. Please run with --combine flag first."
+            )
+
         dataset = Dataset.from_json(dataset_path)
     else:
         raise ValueError("Invalid dataset name")

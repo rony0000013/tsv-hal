@@ -1,4 +1,4 @@
-MODEL_NAME="nanda-10b"
+MODEL_NAME="tiny-aya-global-3b"
 DATASET_NAME="ben_tqa"
 DATA_PATH="TSV_"$MODEL_NAME"_"$DATASET_NAME"_9"
 mkdir -p $DATA_PATH

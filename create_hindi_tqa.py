@@ -137,7 +137,9 @@ def create_bengali_tqa():
 
     for i, item in enumerate(tqdm(dataset)):
         bengali_question = translate_with_google(item["question"], target_lang="bn")
-        bengali_best_answer = translate_with_google(item["best_answer"], target_lang="bn")
+        bengali_best_answer = translate_with_google(
+            item["best_answer"], target_lang="bn"
+        )
         time.sleep(0.1)
 
         bengali_correct_answers = []
@@ -203,8 +205,31 @@ def create_bengali_indices():
     np.save("data_indices/exemplar_idx_bengali_tqa.npy", eng_exemplar_index)
 
 
+def create_english_tqa():
+    dataset = load_dataset("truthful_qa", "generation")["validation"]
+    eng_dataset = []
+
+    for item in dataset:
+        eng_item = {
+            "question": item["question"],
+            "best_answer": item["best_answer"],
+            "correct_answers": item["correct_answers"],
+            "incorrect_answers": item["incorrect_answers"],
+            "category": item["category"],
+        }
+        if "question_id" in item:
+            eng_item["question_id"] = item["question_id"]
+        eng_dataset.append(eng_item)
+
+    with open("english_truthful_qa.json", "w", encoding="utf-8") as f:
+        json.dump(eng_dataset, f, ensure_ascii=False, indent=2)
+
+    print(f"Saved {len(eng_dataset)} items to english_truthful_qa.json")
+
+
 if __name__ == "__main__":
+    create_english_tqa()
     # create_hindi_tqa()
     # create_hindi_indices()
-    create_bengali_tqa()
-    create_bengali_indices()
+    # create_bengali_tqa()
+    # create_bengali_indices()

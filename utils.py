@@ -13,6 +13,7 @@ class Args:
     most_likely: bool
     wild_ratio: float
     thres_gt: float
+    thres_percentile: float
     model_dir: str
     batch_size: int
     cos_temp: float
@@ -96,47 +97,47 @@ def get_ex_data(
     num_samples = len(prompts)
 
     with torch.no_grad():
-            with autocast(device_type="cuda", dtype=torch.float16):
-                for batch_start in tqdm(range(0, num_samples, batch_size)):
-                    batch_prompts = prompts[batch_start : batch_start + batch_size]
-                    batch_labels = labels[batch_start : batch_start + batch_size]
-                    batch_prompts, batch_labels = collate_fn(batch_prompts, batch_labels)
-                    attention_mask = (batch_prompts != 0).half()
-                    batch_prompts = batch_prompts.cuda()
-                    batch_labels = batch_labels.cuda()
-                    attention_mask = attention_mask.to(batch_prompts.device)
-                    all_labels.append(batch_labels.cpu().numpy())
+        with autocast(device_type="cuda", dtype=torch.bfloat16):
+            for batch_start in tqdm(range(0, num_samples, batch_size)):
+                batch_prompts = prompts[batch_start : batch_start + batch_size]
+                batch_labels = labels[batch_start : batch_start + batch_size]
+                batch_prompts, batch_labels = collate_fn(batch_prompts, batch_labels)
+                attention_mask = (batch_prompts != 0).half()
+                batch_prompts = batch_prompts.cuda()
+                batch_labels = batch_labels.cuda()
+                attention_mask = attention_mask.to(batch_prompts.device)
+                all_labels.append(batch_labels.cpu().numpy())
 
-                    # Use the base model to skip the expensive LM head/logits calculation
-                    base_model = model.model if hasattr(model, "model") else model
-                    output = base_model(
-                        batch_prompts.squeeze(1),
-                        attention_mask=attention_mask.squeeze(1),
-                        output_hidden_states=True,
-                    )
+                # Use the base model to skip the expensive LM head/logits calculation
+                base_model = model.model if hasattr(model, "model") else model
+                output = base_model(
+                    batch_prompts.squeeze(1),
+                    attention_mask=attention_mask.squeeze(1),
+                    output_hidden_states=True,
+                )
 
-                    # Access the last layer directly from the tuple to save memory
-                    last_layer_hidden_state = output.hidden_states[-1]
+                # Access the last layer directly from the tuple to save memory
+                last_layer_hidden_state = output.hidden_states[-1]
 
-                    last_token_rep = get_last_non_padded_token_rep(
-                        last_layer_hidden_state, attention_mask.squeeze(1)
-                    )
-                    all_embeddings.append(last_token_rep)
+                last_token_rep = get_last_non_padded_token_rep(
+                    last_layer_hidden_state, attention_mask.squeeze(1)
+                )
+                all_embeddings.append(last_token_rep)
 
-            all_embeddings = F.normalize(torch.concat(all_embeddings), p=2, dim=-1)
+        all_embeddings = F.normalize(torch.concat(all_embeddings), p=2, dim=-1)
 
-            pseudo_label = sinkhorn(all_embeddings, centroids)
+        pseudo_label = sinkhorn(all_embeddings, centroids)
 
-            selected_indices = compute_entropy(
-                all_embeddings,
-                centroids,
-                pseudo_label,
-                num_selected_data,
-                cls_dist,
-                args,
-            )
+        selected_indices = compute_entropy(
+            all_embeddings,
+            centroids,
+            pseudo_label,
+            num_selected_data,
+            cls_dist,
+            args,
+        )
 
-            selected_labels_soft = pseudo_label[selected_indices]
+        selected_labels_soft = pseudo_label[selected_indices]
 
     return selected_indices, selected_labels_soft
 
