@@ -184,13 +184,6 @@ This creates a directory `TSV_<model>_combined_tqa_<str_layer>` with a merged da
 
 ---
 
-If you want, I can:
-- Add a minimal `requirements.txt` with the most essential Python packages extracted from the Pixi lockfile,
-- Create a sample `.env.example` file with recommended variables,
-- Or update `HF_NAMES` to accept fully-qualified HF model IDs (instead of local absolute paths) and add an example of running a small CPU-only toy run for fast debugging.
-
-Which of those should I do next?
-
 
 
 
